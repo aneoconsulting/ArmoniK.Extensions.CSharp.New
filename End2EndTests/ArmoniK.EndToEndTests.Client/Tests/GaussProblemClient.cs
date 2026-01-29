@@ -38,9 +38,10 @@ public class GaussProblemClient : ClientBase
   ///   Adds all integers from 1 to 10 (added two by two on worker side with subtasking)
   ///   and check that result is 55
   /// </summary>
-  [TestCase(10)]
-  public async Task GaussProblem(int N)
+  [Test]
+  public async Task GaussProblem()
   {
+    var N        = 10;
     var callback = new Callback();
     var task = new TaskDefinition().WithLibrary(WorkerLibrary!)
                                    .WithTaskOptions(TaskConfiguration!)
