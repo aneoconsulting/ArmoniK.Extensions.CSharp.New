@@ -32,7 +32,8 @@ namespace ArmoniK.Extensions.CSharp.Client.Services;
 public static class ArmoniKServicesExt
 {
   /// <summary>
-  ///   Asynchronously sends a dynamic library blob to a blob service
+  ///   Asynchronously sends a dynamic library blob to a blob service and updates the DynamicLibrary instance
+  ///   with library blob id.
   /// </summary>
   /// <param name="blobService">The blob service to use for uploading the library.</param>
   /// <param name="session">The session information associated with the blob upload.</param>
@@ -58,7 +59,8 @@ public static class ArmoniKServicesExt
   }
 
   /// <summary>
-  ///   Asynchronously sends a dynamic library blob to a blob service
+  ///   Asynchronously sends a dynamic library blob to a blob service and updates the DynamicLibrary instance
+  ///   with library blob id.
   /// </summary>
   /// <param name="blobService">The blob service to use for uploading the library.</param>
   /// <param name="session">The session information associated with the blob upload.</param>
