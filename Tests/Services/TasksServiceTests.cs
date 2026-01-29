@@ -14,8 +14,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-using System.Text;
-
 using ArmoniK.Api.gRPC.V1.Tasks;
 using ArmoniK.Extensions.CSharp.Client.Common.Domain.Blob;
 using ArmoniK.Extensions.CSharp.Client.Common.Domain.Session;
@@ -32,6 +30,9 @@ using Moq;
 
 using NUnit.Framework;
 
+using System.Text;
+using System.Threading.Tasks;
+
 using Tests.Configuration;
 using Tests.Helpers;
 
@@ -45,6 +46,65 @@ public class TasksServiceTests
   [SetUp]
   public void Setup()
     => MockHelper.InitMock();
+
+  [Test]
+  public async Task CreateSharedBlobs()
+  {
+    var client = new MockedArmoniKClient();
+    var mock = client.CallInvokerMock;
+
+    var taskOption = new TaskConfiguration
+    {
+      PartitionId = "subtasking",
+    };
+    var sessionInfo = new SessionInfo("sessionId1");
+
+    // Configure blob metadata creation response
+    var outputBlob1 = (sessionId: sessionInfo.SessionId, blobId: "blobId1", blobName: "outputBlob1");
+    var outputBlob2 = (sessionId: sessionInfo.SessionId, blobId: "blobId2", blobName: "outputBlob2");
+    mock.ConfigureBlobMetadataCreationResponse(outputBlob1, outputBlob2);
+
+    // Configure blob creation response
+    var blob =     (sessionId: sessionInfo.SessionId, blobId: "inputBlob", blobName: "param");
+    var blobCreationSequence = mock.ConfigureBlobCreationResponseSequence(blob);
+
+    // Configure blob creation response
+    var payload1 = (sessionId: sessionInfo.SessionId, blobId: "payloadId1", blobName: "payload1");
+    var payload2 = (sessionId: sessionInfo.SessionId, blobId: "payloadId2", blobName: "payload2");
+    blobCreationSequence.ConfigureBlobCreationResponseSequence(payload1, payload2)
+        .Stop();
+
+    var blobDefinition = BlobDefinition.FromString(blob.blobName,
+                                       "Hello!");
+
+    // Configure task submission response
+    (string taskId, string payloadId, string[]? inputs, string[]? outputs) task1 =
+      (taskId: "taskId1", payloadId: payload1.blobId, inputs: [blob.blobId], outputs: [outputBlob1.blobId]);
+    var taskDefinition1 = new TaskDefinition().WithInput("param1", blobDefinition)
+                                    .WithOutput("result1", BlobDefinition.CreateOutput(outputBlob1.blobName))
+                                    .WithTaskOptions(taskOption);
+    (string taskId, string payloadId, string[]? inputs, string[]? outputs) task2 =
+      (taskId: "taskId2", payloadId: payload2.blobId, inputs: [blob.blobId], outputs: [outputBlob2.blobId]);
+    var taskDefinition2 = new TaskDefinition().WithInput("param2", blobDefinition)
+                                    .WithOutput("result2", BlobDefinition.CreateOutput(outputBlob2.blobName))
+                                    .WithTaskOptions(taskOption);
+
+    mock.ConfigureSubmitTaskResponse(task1, task2);
+
+    // Configure blob service configuration response
+    mock.ConfigureBlobService();
+
+    var result = await client.TasksService.SubmitTasksAsync(sessionInfo,
+                                                            [taskDefinition1, taskDefinition2])
+                             .ConfigureAwait(false);
+    
+    var taskInfosEnumerable = result as TaskInfos[] ?? result.ToArray();
+    Assert.Multiple(() =>
+    {
+      Assert.That(taskInfosEnumerable[0].DataDependencies, Is.EquivalentTo(new string[] { blob.blobId }));
+      Assert.That(taskInfosEnumerable[1].DataDependencies, Is.EquivalentTo(new string[] { blob.blobId }));
+    });
+  }
 
   [Test]
   public async Task CreateTaskReturnsNewTaskWithId()
