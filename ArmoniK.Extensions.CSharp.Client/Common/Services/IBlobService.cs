@@ -160,10 +160,10 @@ public interface IBlobService
   /// <param name="session">The session information in which the blob is created.</param>
   /// <param name="blobDescs">The BlobInfo associated with its OpaqueId.</param>
   /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
-  /// <returns></returns>
-  Task<ICollection<BlobState>> ImportBlobDataAsync(SessionInfo                                 session,
-                                                   IEnumerable<KeyValuePair<BlobInfo, byte[]>> blobDescs,
-                                                   CancellationToken                           cancellationToken = default);
+  /// <returns> An asynchronous enumerable of blob states.</returns>
+  IAsyncEnumerable<BlobState> ImportBlobDataAsync(SessionInfo                                 session,
+                                                  IEnumerable<KeyValuePair<BlobInfo, byte[]>> blobDescs,
+                                                  CancellationToken                           cancellationToken = default);
 }
 
 /// <summary>

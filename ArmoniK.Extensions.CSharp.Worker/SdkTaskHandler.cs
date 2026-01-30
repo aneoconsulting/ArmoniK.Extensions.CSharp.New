@@ -14,6 +14,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using System.Runtime.CompilerServices;
+using System.Text;
+
 using ArmoniK.Api.gRPC.V1.Agent;
 using ArmoniK.Api.Worker.Worker;
 using ArmoniK.Extensions.CSharp.Common.Common.Domain.Task;
@@ -26,9 +29,6 @@ using ArmoniK.Extensions.CSharp.Worker.Interfaces.Handles;
 using ArmoniK.Utils;
 
 using Google.Protobuf;
-
-using System.Runtime.CompilerServices;
-using System.Text;
 
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
@@ -304,9 +304,9 @@ internal class SdkTaskHandler : ISdkTaskHandler
           var name2Blob = blobsWithoutDuplicateName.ToDictionary(b => b.Name,
                                                                  b => b);
           var blobsCreate = blobsWithoutDuplicateName.Select(b => new CreateResultsMetaDataRequest.Types.ResultCreate
-                                                              {
-                                                                Name = b.Name,
-                                                              });
+                                                                  {
+                                                                    Name = b.Name,
+                                                                  });
           var response = await taskHandler_.CreateResultsMetaDataAsync(blobsCreate,
                                                                        cancellationToken)
                                            .ConfigureAwait(false);

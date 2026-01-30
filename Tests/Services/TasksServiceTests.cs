@@ -102,9 +102,10 @@ public class TasksServiceTests
 
     var result = await client.TasksService.SubmitTasksAsync(sessionInfo,
                                                             [taskDefinition1, taskDefinition2])
+                             .ToArrayAsync()
                              .ConfigureAwait(false);
 
-    var taskInfosEnumerable = result as TaskInfos[] ?? result.ToArray();
+    var taskInfosEnumerable = result ?? result.ToArray();
     Assert.Multiple(() =>
                     {
                       Assert.That(taskInfosEnumerable[0].DataDependencies,
@@ -157,7 +158,7 @@ public class TasksServiceTests
                              .ToArrayAsync()
                              .ConfigureAwait(false);
 
-    var taskInfosEnumerable = result as TaskInfos[] ?? result.ToArray();
+    var taskInfosEnumerable = result ?? result.ToArray();
     Assert.Multiple(() =>
                     {
                       Assert.That(taskInfosEnumerable.Length,
@@ -649,6 +650,7 @@ public class TasksServiceTests
                   };
 
     var result = await client.TasksService.CancelTasksAsync(taskIds)
+                             .ToArrayAsync()
                              .ConfigureAwait(false);
 
     Assert.Multiple(() =>
@@ -814,7 +816,9 @@ public class TasksServiceTests
                     "nonExistentTaskId2",
                   };
 
-    Assert.That(async () => await client.TasksService.CancelTasksAsync(taskIds),
+    Assert.That(async () => await client.TasksService.CancelTasksAsync(taskIds)
+                                        .ToArrayAsync()
+                                        .ConfigureAwait(false),
                 Throws.Exception.TypeOf<RpcException>());
   }
 }

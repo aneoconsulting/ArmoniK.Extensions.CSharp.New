@@ -271,7 +271,7 @@ public class SessionHandle : IAsyncDisposable, IDisposable
                                                                 tasks,
                                                                 cancellationToken);
     var enumTaskDefinition = tasks.GetEnumerator();
-    await foreach (var  taskInfo in taskInfos.ConfigureAwait(false))
+    await foreach (var taskInfo in taskInfos.ConfigureAwait(false))
     {
       enumTaskDefinition.MoveNext();
       var taskDefinition = enumTaskDefinition.Current;
@@ -286,7 +286,9 @@ public class SessionHandle : IAsyncDisposable, IDisposable
           callbackRunner.Add(blob);
         }
       }
-      taskDefinition.TaskHandle = new TaskHandle(ArmoniKClient, taskInfo);
+
+      taskDefinition.TaskHandle = new TaskHandle(ArmoniKClient,
+                                                 taskInfo);
     }
   }
 

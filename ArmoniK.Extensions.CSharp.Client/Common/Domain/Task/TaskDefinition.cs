@@ -41,9 +41,9 @@ public class TaskDefinition
   public Dictionary<string, BlobDefinition> Outputs { get; } = new();
 
   /// <summary>
-  /// The TaskHandle instance returned by the submission
+  ///   The TaskHandle instance returned by the submission
   /// </summary>
-  public TaskHandle? TaskHandle { get; internal set;}
+  public TaskHandle? TaskHandle { get; internal set; }
 
   /// <summary>
   ///   Task options

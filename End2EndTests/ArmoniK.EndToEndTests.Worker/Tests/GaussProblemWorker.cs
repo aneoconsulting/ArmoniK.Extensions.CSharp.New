@@ -20,8 +20,6 @@ using ArmoniK.Extensions.CSharp.Worker.Interfaces.Common.Domain.Task;
 
 using Microsoft.Extensions.Logging;
 
-using System.Linq;
-
 using TaskDefinition = ArmoniK.Extensions.CSharp.Worker.Interfaces.Common.Domain.Task.TaskDefinition;
 
 namespace ArmoniK.EndToEndTests.Worker.Tests;
