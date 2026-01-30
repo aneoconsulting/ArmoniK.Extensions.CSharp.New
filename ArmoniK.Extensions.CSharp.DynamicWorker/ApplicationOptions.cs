@@ -16,8 +16,18 @@
 
 namespace ArmoniK.Extensions.CSharp.DynamicWorker;
 
+/// <summary>
+/// Defines keys used in appSettings.json
+/// </summary>
 public static class ApplicationOptions
 {
+  /// <summary>
+  /// Path where dynamic libraries are installed.
+  /// </summary>
   public const string ServiceAssemblyPath = "ServiceAssemblyPath";
+
+  /// <summary>
+  /// Path where dynamic librarie's zip are copied.
+  /// </summary>
   public const string ZipPath             = "ZipPath";
 }
