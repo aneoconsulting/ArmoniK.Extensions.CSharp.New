@@ -62,11 +62,11 @@ internal sealed class WorkerService : IDisposable
   public static async Task<WorkerService> CreateWorkerService(ITaskHandler      taskHandler,
                                                               DynamicLibrary    dynamicLibrary,
                                                               ILoggerFactory    loggerFactory,
+                                                              string            assemblyPath,
+                                                              string            zipPath,
                                                               CancellationToken cancellationToken)
   {
     var zipFilename = $"{dynamicLibrary}.zip";
-    var zipPath     = @"/tmp/zip";
-    var unzipPath   = @"/tmp/assemblies";
     var libraryPath = dynamicLibrary.LibraryPath;
     var loadContext = new AssemblyLoadContext(dynamicLibrary.Symbol,
                                               true);
@@ -74,7 +74,7 @@ internal sealed class WorkerService : IDisposable
 
     try
     {
-      logger.LogInformation($"Starting Dynamic loading - FileName: {zipFilename}, FilePath: {zipPath}, DestinationToUnZip:{unzipPath}, LibraryPath:{libraryPath}, Symbol: {dynamicLibrary.Symbol}");
+      logger.LogInformation($"Starting Dynamic loading - FileName: {zipFilename}, FilePath: {zipPath}, DestinationToUnZip:{assemblyPath}, LibraryPath:{libraryPath}, Symbol: {dynamicLibrary.Symbol}");
       var libraryBytes = taskHandler.DataDependencies[dynamicLibrary.LibraryBlobId];
       Directory.CreateDirectory(zipPath);
 
@@ -90,7 +90,7 @@ internal sealed class WorkerService : IDisposable
       logger.LogInformation("Extracting from archive {localZip}",
                             zipFilePath);
 
-      var libUnzipPath = Path.Combine(unzipPath,
+      var libUnzipPath = Path.Combine(assemblyPath,
                                       dynamicLibrary.LibraryBlobId);
       var extractedFilePath = ExtractArchive(zipFilename,
                                              zipPath,

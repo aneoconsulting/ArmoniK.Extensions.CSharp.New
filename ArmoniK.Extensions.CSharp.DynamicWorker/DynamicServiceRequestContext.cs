@@ -27,9 +27,11 @@ namespace ArmoniK.Extensions.CSharp.DynamicWorker;
 /// </summary>
 public sealed class DynamicServiceRequestContext : IServiceRequestContext, IAsyncDisposable, IDisposable
 {
+  private readonly string        assembliesPath_;
   private readonly LibraryLoader libraryLoader_;
   private readonly LibraryWorker libraryWorker_;
   private readonly ILogger       logger_;
+  private readonly string        zipPath_;
 
   private string currentSession_ = string.Empty;
 
@@ -41,8 +43,10 @@ public sealed class DynamicServiceRequestContext : IServiceRequestContext, IAsyn
   public DynamicServiceRequestContext(IConfiguration configuration,
                                       ILoggerFactory loggerFactory)
   {
-    LoggerFactory = loggerFactory;
-    logger_       = loggerFactory.CreateLogger<DynamicServiceRequestContext>();
+    assembliesPath_ = configuration[ApplicationOptions.ServiceAssemblyPath] ?? "/tmp/assemblies";
+    zipPath_        = configuration[ApplicationOptions.ZipPath]             ?? "/tmp/zip";
+    LoggerFactory   = loggerFactory;
+    logger_         = loggerFactory.CreateLogger<DynamicServiceRequestContext>();
 
     libraryLoader_ = new LibraryLoader(loggerFactory);
     libraryWorker_ = new LibraryWorker(configuration,
@@ -103,6 +107,8 @@ public sealed class DynamicServiceRequestContext : IServiceRequestContext, IAsyn
 
     var workerInstance = await libraryLoader_.GetWorkerInstanceAsync(taskHandler,
                                                                      dynamicLibrary,
+                                                                     assembliesPath_,
+                                                                     zipPath_,
                                                                      cancellationToken)
                                              .ConfigureAwait(false);
 
