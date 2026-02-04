@@ -15,13 +15,31 @@
 // limitations under the License.
 //
 
+using ArmoniK.Extensions.CSharp.Worker.Interfaces;
+using ArmoniK.Extensions.CSharp.Worker.Interfaces.Common.Domain.Task;
+
+using Microsoft.Extensions.Logging;
+
+using System.Reflection;
+using System.Runtime.Loader;
+
 namespace ClassLibraryTest
 {
-  public class MyClass
+  public class MyClass : IWorker
   {
-    public string Run()
+    public Task<HealthCheckResult> CheckHealth(CancellationToken cancellationToken = default)
+      => Task.FromResult(HealthCheckResult.Healthy());
+
+    public async Task<TaskResult> ExecuteAsync(ISdkTaskHandler taskHandler, ILogger logger, CancellationToken cancellationToken)
     {
-      return "Hello I am MyClass.Run()";
+      var name = taskHandler.Inputs["name"]
+                      .GetStringData();
+
+      await taskHandler.Outputs["helloResult"]
+                       .SendStringResultAsync($"Hello {name} from dynamic worker loaded dynamicaly!",
+                                              cancellationToken: cancellationToken)
+                       .ConfigureAwait(false);
+      return TaskResult.Success;
     }
   }
 }

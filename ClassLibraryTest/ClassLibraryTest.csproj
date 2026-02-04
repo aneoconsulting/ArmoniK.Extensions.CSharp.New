@@ -6,4 +6,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\ArmoniK.Extensions.CSharp.Worker.Interfaces\ArmoniK.Extensions.CSharp.Worker.Interfaces.csproj" />
+  </ItemGroup>
+
 </Project>

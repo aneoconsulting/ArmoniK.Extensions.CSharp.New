@@ -41,17 +41,30 @@ internal class HelloWorker : IWorker
                                              ILogger           logger,
                                              CancellationToken cancellationToken)
   {
-    var name = taskHandler.Inputs["name"]
-                          .GetStringData();
+    /*    var name = taskHandler.Inputs["name"]
+                              .GetStringData();
+
+        await taskHandler.Outputs["helloResult"]
+                         .SendStringResultAsync($"Hello {name} from dynamic worker!",
+                                                cancellationToken: cancellationToken)
+                         .ConfigureAwait(false);*/
 
     var thisAssembly = Assembly.GetExecutingAssembly();
     var loadContext = AssemblyLoadContext.GetLoadContext(thisAssembly);
+    string fullAssemblyPath = Assembly.GetExecutingAssembly().Location;
+    string assemblyPath = Path.GetDirectoryName(fullAssemblyPath)!;
+    logger.LogInformation("Current worker path:{Path}", assemblyPath);
 
-    await taskHandler.Outputs["helloResult"]
-                     .SendStringResultAsync($"Hello {name} from dynamic worker!",
-                                            cancellationToken: cancellationToken)
-                     .ConfigureAwait(false);
-    return TaskResult.Success;
+    var classLibTestPath = Path.Combine(assemblyPath, @"ClassLibraryTest/ClassLibraryTest.dll");
+    logger.LogInformation("Entry point assembly path: {Path}", classLibTestPath);
+
+    var libAssembly = loadContext!.LoadFromAssemblyPath(classLibTestPath);
+    var classType = libAssembly.GetType($"ClassLibraryTest.MyClass");
+    var myInstance = (IWorker)Activator.CreateInstance(classType!)!;
+
+    return await myInstance.ExecuteAsync(taskHandler, logger, cancellationToken).ConfigureAwait(false);
+
+    // return TaskResult.Success;
   }
 
   /// <summary>
