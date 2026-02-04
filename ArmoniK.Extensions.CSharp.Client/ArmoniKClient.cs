@@ -177,7 +177,8 @@ public class ArmoniKClient
   /// <param name="taskInfos">The task information.</param>
   /// <returns>A task representing the asynchronous operation. The task result contains the task handle instance.</returns>
   public TaskHandle GetTaskHandle(TaskInfos taskInfos)
-    => TaskHandle.FromTaskInfos(taskInfos, this);
+    => TaskHandle.FromTaskInfos(this,
+                                taskInfos);
 
   /// <summary>
   ///   Gets a session handle for the specified session information.

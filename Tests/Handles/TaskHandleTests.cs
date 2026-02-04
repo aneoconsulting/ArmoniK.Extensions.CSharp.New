@@ -58,8 +58,10 @@ public class TaskHandleTests
   [Test]
   public async Task ConstructorShouldInitializeProperties()
   {
-    var taskHandle = TaskHandle.FromTaskInfos(mockTaskInfos_!, mockedArmoniKClient_!);
-    var convertedTaskInfos = await taskHandle.GetTaskInfosAsync().ConfigureAwait(false);
+    var taskHandle = TaskHandle.FromTaskInfos(mockedArmoniKClient_!,
+                                              mockTaskInfos_!);
+    var convertedTaskInfos = await taskHandle.GetTaskInfosAsync()
+                                             .ConfigureAwait(false);
 
     Assert.Multiple(() =>
                     {
@@ -75,22 +77,26 @@ public class TaskHandleTests
 
   [Test]
   public void ConstructorThrowsArgumentNullExceptionWhenClientIsNull()
-    => Assert.That(() => TaskHandle.FromTaskInfos(mockTaskInfos_!, null!),
+    => Assert.That(() => TaskHandle.FromTaskInfos(null!,
+                                                  mockTaskInfos_!),
                    Throws.ArgumentNullException.With.Property(nameof(ArgumentNullException.ParamName))
                          .EqualTo("armoniKClient"));
 
   [Test]
   public void ConstructorThrowsArgumentNullExceptionWhenTaskInfosIsNull()
-    => Assert.That(() => TaskHandle.FromTaskInfos(null!, mockedArmoniKClient_!),
+    => Assert.That(() => TaskHandle.FromTaskInfos(mockedArmoniKClient_!,
+                                                  null!),
                    Throws.ArgumentNullException.With.Property(nameof(ArgumentNullException.ParamName))
                          .EqualTo("taskInfos"));
 
   [Test]
   public async Task ImplicitConversionToTaskInfosShouldReturnCorrectTaskInfos()
   {
-    var taskHandle = TaskHandle.FromTaskInfos(mockTaskInfos_!, mockedArmoniKClient_!);
+    var taskHandle = TaskHandle.FromTaskInfos(mockedArmoniKClient_!,
+                                              mockTaskInfos_!);
 
-    TaskInfos convertedTaskInfos = await taskHandle.GetTaskInfosAsync().ConfigureAwait(false);
+    var convertedTaskInfos = await taskHandle.GetTaskInfosAsync()
+                                             .ConfigureAwait(false);
 
     Assert.That(convertedTaskInfos,
                 Is.EqualTo(mockTaskInfos_));
@@ -99,9 +105,10 @@ public class TaskHandleTests
   [Test]
   public async Task FromTaskInfosCreatesTaskHandleCorrectly()
   {
-    var taskHandle = TaskHandle.FromTaskInfos(mockTaskInfos_!,
-                                              mockedArmoniKClient_!);
-    var convertedTaskInfos = await taskHandle.GetTaskInfosAsync().ConfigureAwait(false);
+    var taskHandle = TaskHandle.FromTaskInfos(mockedArmoniKClient_!,
+                                              mockTaskInfos_!);
+    var convertedTaskInfos = await taskHandle.GetTaskInfosAsync()
+                                             .ConfigureAwait(false);
 
     Assert.Multiple(() =>
                     {
@@ -117,22 +124,23 @@ public class TaskHandleTests
 
   [Test]
   public void FromTaskInfosThrowsArgumentNullExceptionWhenTaskInfosIsNull()
-    => Assert.That(() => TaskHandle.FromTaskInfos(null!,
-                                                  mockedArmoniKClient_!),
+    => Assert.That(() => TaskHandle.FromTaskInfos(mockedArmoniKClient_!,
+                                                  null!),
                    Throws.ArgumentNullException.With.Property(nameof(ArgumentNullException.ParamName))
                          .EqualTo("taskInfos"));
 
   [Test]
   public void FromTaskInfosThrowsArgumentNullExceptionWhenClientIsNull()
-    => Assert.That(() => TaskHandle.FromTaskInfos(mockTaskInfos_!,
-                                                  null!),
+    => Assert.That(() => TaskHandle.FromTaskInfos(null!,
+                                                  mockTaskInfos_!),
                    Throws.ArgumentNullException.With.Property(nameof(ArgumentNullException.ParamName))
                          .EqualTo("armoniKClient"));
 
   [Test]
   public void ImplicitConversionWorksInMethodParameters()
   {
-    var taskHandle = TaskHandle.FromTaskInfos(mockTaskInfos_!, mockedArmoniKClient_!);
+    var taskHandle = TaskHandle.FromTaskInfos(mockedArmoniKClient_!,
+                                              mockTaskInfos_!);
 
     Assert.That(() => Assert.That(taskHandle,
                                   Is.Not.Null),
@@ -142,7 +150,8 @@ public class TaskHandleTests
   [Test]
   public void GetTaskDetailsAsyncWithCancellationTokenCancels()
   {
-    var taskHandle = TaskHandle.FromTaskInfos(mockTaskInfos_!, mockedArmoniKClient_!);
+    var taskHandle = TaskHandle.FromTaskInfos(mockedArmoniKClient_!,
+                                              mockTaskInfos_!);
 
     var cancellationTokenSource = new CancellationTokenSource();
     cancellationTokenSource.Cancel();
