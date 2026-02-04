@@ -45,6 +45,7 @@ internal class FailingTaskClient : ClientBase
                                                                        .WithCallback(callback))
                                              .WithTaskOptions(TaskConfiguration!);
     await SessionHandle!.SubmitAsync([taskDefinition])
+                        .SingleAsync()
                         .ConfigureAwait(false);
 
     await SessionHandle.WaitCallbacksAsync()

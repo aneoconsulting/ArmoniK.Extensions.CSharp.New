@@ -73,6 +73,7 @@ public class PriorityClient : ClientBase
       foreach (var taskDefinition in taskDefinitions)
       {
         await SessionHandle!.SubmitAsync([taskDefinition])
+                            .SingleAsync()
                             .ConfigureAwait(false);
       }
 

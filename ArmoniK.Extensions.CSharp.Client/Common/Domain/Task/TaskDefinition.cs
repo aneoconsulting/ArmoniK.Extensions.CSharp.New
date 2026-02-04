@@ -18,7 +18,6 @@ using System.Collections.Generic;
 
 using ArmoniK.Extensions.CSharp.Client.Common.Domain.Blob;
 using ArmoniK.Extensions.CSharp.Client.Exceptions;
-using ArmoniK.Extensions.CSharp.Client.Handles;
 using ArmoniK.Extensions.CSharp.Common.Common.Domain.Blob;
 using ArmoniK.Extensions.CSharp.Common.Common.Domain.Task;
 using ArmoniK.Extensions.CSharp.Common.Library;
@@ -39,11 +38,6 @@ public class TaskDefinition
   ///   Output blobs
   /// </summary>
   public Dictionary<string, BlobDefinition> Outputs { get; } = new();
-
-  /// <summary>
-  ///   The TaskHandle instance returned by the submission
-  /// </summary>
-  public TaskHandle? TaskHandle { get; internal set; }
 
   /// <summary>
   ///   Task options

@@ -106,16 +106,17 @@ internal class Program
                                                BlobDefinition.CreateOutput("Result"))
                                    .WithTaskOptions(defaultTaskOptions);
 
-    await sessionHandle.SubmitAsync([task],
-                                    CancellationToken.None)
-                       .ConfigureAwait(false);
+    var taskHandle = await sessionHandle.SubmitAsync([task],
+                                                     CancellationToken.None)
+                                        .SingleAsync()
+                                        .ConfigureAwait(false);
 
     BlobInfo resultBlobInfo = task.Outputs.Values.First()
                                   .BlobHandle!;
     logger.LogInformation("resultId: {ResultId}",
                           resultBlobInfo.BlobId);
     logger.LogInformation("taskId: {TaskId}",
-                          ((TaskInfos)task.TaskHandle!).TaskId);
+                          ((TaskInfos)taskHandle).TaskId);
 
     await eventsService.WaitForBlobsAsync(sessionHandle,
                                           [resultBlobInfo])
