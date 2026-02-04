@@ -258,16 +258,35 @@ public class SessionHandle : IAsyncDisposable, IDisposable
   }
 
   /// <summary>
+  ///   Submit a task.
+  /// </summary>
+  /// <param name="task">The task to submit</param>
+  /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
+  /// <returns>The TaskHandle instance.</returns>
+  /// <exception cref="ArgumentException">When the task parameter provided is null</exception>
+  public TaskHandle Submit(TaskDefinition task,
+                           CancellationToken cancellationToken = default)
+  {
+    _ = task ?? throw new ArgumentNullException(nameof(task));
+
+    var backgroundSubmitter = CreateBackgroundSubmitterIfNeeded(cancellationToken);
+    var taskHandle = TaskHandle.FromTaskCompletionSourceOfTaskInfos(new TaskCompletionSource<TaskInfos>(),
+                                                                    ArmoniKClient);
+    backgroundSubmitter.Add(task, taskHandle);
+    return taskHandle;
+  }
+
+  /// <summary>
   ///   Submit a collection of tasks.
   /// </summary>
   /// <param name="tasks">The tasks to submit</param>
   /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
-  /// <returns>A task representing the asynchronous operation.</returns>
+  /// <returns>The collection of TaskHandle instances.</returns>
   /// <exception cref="ArgumentException">When the tasks parameter provided is null</exception>
   public ICollection<TaskHandle> Submit(ICollection<TaskDefinition> tasks,
                                         CancellationToken           cancellationToken = default)
   {
-    _ = tasks ?? throw new ArgumentException("Tasks parameter should not be null");
+    _ = tasks ?? throw new ArgumentNullException(nameof(tasks));
 
     var backgroundSubmitter = CreateBackgroundSubmitterIfNeeded(cancellationToken);
     var taskHandles = new TaskHandle[tasks.Count];

@@ -55,7 +55,7 @@ public class GaussProblemClient : ClientBase
                                                i.ToString()));
     }
 
-    SessionHandle!.Submit([task]);
+    SessionHandle!.Submit(task);
 
     await SessionHandle.WaitSubmissionAsync()
                        .ConfigureAwait(false);

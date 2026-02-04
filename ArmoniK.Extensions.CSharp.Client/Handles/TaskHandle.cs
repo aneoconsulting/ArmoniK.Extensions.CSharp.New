@@ -88,7 +88,7 @@ public class TaskHandle
   /// <summary>
   ///   Get the TaskInfo instance.
   /// </summary>
-  /// <returns>The task's TaskInfo instance</returns>
+  /// <returns>A task representing the asynchronous operation. The task result contains the TaskInfo instance</returns>
   public async Task<TaskInfos> GetTaskInfosAsync()
   {
     if (TaskInfosSource != null)
@@ -107,7 +107,10 @@ public class TaskHandle
   ///   the result.
   /// </returns>
   public async Task<TaskState> GetTaskDetailsAsync(CancellationToken cancellationToken)
-    => await ArmoniKClient.TasksService.GetTasksDetailedAsync(taskInfos_.TaskId,
-                                                              cancellationToken)
-                          .ConfigureAwait(false);
+  {
+    var taskInfos = await GetTaskInfosAsync().ConfigureAwait(false);
+    return await ArmoniKClient.TasksService.GetTasksDetailedAsync(taskInfos.TaskId,
+                                                                  cancellationToken)
+                              .ConfigureAwait(false);
+  }
 }

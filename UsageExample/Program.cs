@@ -106,9 +106,7 @@ internal class Program
                                                BlobDefinition.CreateOutput("Result"))
                                    .WithTaskOptions(defaultTaskOptions);
 
-    var taskHandle = sessionHandle.Submit([task],
-                                                     CancellationToken.None)
-                                       .Single();
+    var taskHandle = sessionHandle.Submit(task, CancellationToken.None);
 
     BlobInfo resultBlobInfo = task.Outputs.Values.First()
                                   .BlobHandle!;
