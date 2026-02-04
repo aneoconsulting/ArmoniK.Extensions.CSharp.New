@@ -163,6 +163,8 @@ internal sealed class LibraryLoader : IAsyncDisposable, IDisposable
   /// <exception cref="ArmoniKSdkException">Thrown when there is an error loading the library.</exception>
   public async Task<IWorker> GetWorkerInstanceAsync(ITaskHandler      taskHandler,
                                                     DynamicLibrary    dynamicLibrary,
+                                                    string            assemblyPath,
+                                                    string            zipPath,
                                                     CancellationToken cancellationToken)
   {
     try
@@ -186,6 +188,8 @@ internal sealed class LibraryLoader : IAsyncDisposable, IDisposable
       var service = await WorkerService.CreateWorkerService(taskHandler,
                                                             dynamicLibrary,
                                                             loggerFactory_,
+                                                            assemblyPath,
+                                                            zipPath,
                                                             cancellationToken)
                                        .ConfigureAwait(false);
 
