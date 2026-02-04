@@ -19,6 +19,9 @@ using ArmoniK.Extensions.CSharp.Worker.Interfaces.Common.Domain.Task;
 
 using Microsoft.Extensions.Logging;
 
+using System.Reflection;
+using System.Runtime.Loader;
+
 namespace DynamicWorkerExample;
 
 /// <summary>
@@ -40,6 +43,9 @@ internal class HelloWorker : IWorker
   {
     var name = taskHandler.Inputs["name"]
                           .GetStringData();
+
+    var thisAssembly = Assembly.GetExecutingAssembly();
+    var loadContext = AssemblyLoadContext.GetLoadContext(thisAssembly);
 
     await taskHandler.Outputs["helloResult"]
                      .SendStringResultAsync($"Hello {name} from dynamic worker!",
