@@ -41,14 +41,6 @@ internal class HelloWorker : IWorker
                                              ILogger           logger,
                                              CancellationToken cancellationToken)
   {
-    /*    var name = taskHandler.Inputs["name"]
-                              .GetStringData();
-
-        await taskHandler.Outputs["helloResult"]
-                         .SendStringResultAsync($"Hello {name} from dynamic worker!",
-                                                cancellationToken: cancellationToken)
-                         .ConfigureAwait(false);*/
-
     var thisAssembly = Assembly.GetExecutingAssembly();
     var loadContext = AssemblyLoadContext.GetLoadContext(thisAssembly);
     string fullAssemblyPath = Assembly.GetExecutingAssembly().Location;
@@ -63,8 +55,6 @@ internal class HelloWorker : IWorker
     var myInstance = (IWorker)Activator.CreateInstance(classType!)!;
 
     return await myInstance.ExecuteAsync(taskHandler, logger, cancellationToken).ConfigureAwait(false);
-
-    // return TaskResult.Success;
   }
 
   /// <summary>
