@@ -14,15 +14,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Threading;
-using System.Threading.Channels;
-using System.Threading.Tasks;
-
+using ArmoniK.Api.gRPC.V1;
+using ArmoniK.Api.gRPC.V1.Tasks;
 using ArmoniK.Extensions.CSharp.Client.Common.Domain.Blob;
 using ArmoniK.Extensions.CSharp.Client.Common.Domain.Session;
 using ArmoniK.Extensions.CSharp.Client.Common.Domain.Task;
@@ -30,8 +23,19 @@ using ArmoniK.Extensions.CSharp.Client.Exceptions;
 using ArmoniK.Extensions.CSharp.Client.Queryable;
 using ArmoniK.Extensions.CSharp.Client.Services;
 using ArmoniK.Extensions.CSharp.Common.Common.Domain.Blob;
+using ArmoniK.Extensions.CSharp.Common.Common.Domain.Task;
 using ArmoniK.Extensions.CSharp.Common.Library;
 using ArmoniK.Utils;
+
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Diagnostics.Metrics;
+using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Channels;
+using System.Threading.Tasks;
 
 namespace ArmoniK.Extensions.CSharp.Client.Handles;
 
@@ -53,8 +57,8 @@ public class SessionHandle : IAsyncDisposable, IDisposable
 
   private readonly bool   closeOnDispose_;
   private readonly object locker_ = new();
+  private BackgroundSubmitter? backgroundSubmitter_;
 
-  private CallbackRunner? callbackRunner_;
   private int             isDisposed_;
 
   /// <summary>
@@ -69,6 +73,9 @@ public class SessionHandle : IAsyncDisposable, IDisposable
   {
     ArmoniKClient   = armoniKClient ?? throw new ArgumentNullException(nameof(armoniKClient));
     SessionInfo     = session       ?? throw new ArgumentNullException(nameof(session));
+    backgroundSubmitter_ = new BackgroundSubmitter(armoniKClient,
+                                                            session,
+                                                            CancellationToken.None);
     closeOnDispose_ = closeOnDispose;
   }
 
@@ -79,7 +86,7 @@ public class SessionHandle : IAsyncDisposable, IDisposable
   {
     if (!TestAndSetDisposed())
     {
-      await AbortCallbacksAsync()
+      await AbortSubmissionsAsync()
         .ConfigureAwait(false);
       if (closeOnDispose_)
       {
@@ -96,6 +103,26 @@ public class SessionHandle : IAsyncDisposable, IDisposable
     }
   }
 
+  private BackgroundSubmitter? TestAndSetBackgroundSubmitter()
+  {
+    lock (locker_)
+    {
+      var ret = backgroundSubmitter_;
+      backgroundSubmitter_ = null;
+      return ret;
+    }
+  }
+
+  private BackgroundSubmitter CreateBackgroundSubmitterIfNeeded(CancellationToken cancellationToken)
+  {
+    lock (locker_)
+    {
+      return backgroundSubmitter_ ??= new BackgroundSubmitter(ArmoniKClient,
+                                                            SessionInfo,
+                                                            cancellationToken);
+    }
+  }
+
   /// <summary>
   ///   Dispose the resources of the session
   /// </summary>
@@ -106,25 +133,6 @@ public class SessionHandle : IAsyncDisposable, IDisposable
   private bool TestAndSetDisposed()
     => Interlocked.Exchange(ref isDisposed_,
                             1) != 0;
-
-  private CallbackRunner? TestAndSetCallbackRunner()
-  {
-    lock (locker_)
-    {
-      var ret = callbackRunner_;
-      callbackRunner_ = null;
-      return ret;
-    }
-  }
-
-  private CallbackRunner CreateCallbackRunnerIfNeeded(CancellationToken cancellationToken)
-  {
-    lock (locker_)
-    {
-      return callbackRunner_ ??= new CallbackRunner(ArmoniKClient,
-                                                    cancellationToken);
-    }
-  }
 
   /// <summary>
   ///   Implicit conversion operator from SessionHandle to SessionInfo.
@@ -219,38 +227,32 @@ public class SessionHandle : IAsyncDisposable, IDisposable
                           .ConfigureAwait(false);
 
   /// <summary>
-  ///   Asynchronously waits for the blobs defined with a callback, and calls their respective callbacks.
+  ///   Asynchronously waits for pending task submissions and callbacks.
   /// </summary>
   /// <returns>
-  ///   A task representing the asynchronous operation. The task result is true when all callbacks were invoked, false
+  ///   A task representing the asynchronous operation.
   ///   otherwise.
   /// </returns>
-  public async Task<bool> WaitCallbacksAsync()
+  public async Task WaitSubmissionAsync()
   {
-    var callbackRunner = TestAndSetCallbackRunner();
-    if (callbackRunner != null)
+    var backgroundSubmitter = TestAndSetBackgroundSubmitter();
+    if (backgroundSubmitter != null)
     {
-      var result = await callbackRunner.WaitAsync()
-                                       .ConfigureAwait(false);
-      await callbackRunner.DisposeAsync()
-                          .ConfigureAwait(false);
-      return result;
+      await backgroundSubmitter.WaitAsync()
+                               .ConfigureAwait(false);
     }
-
-    return true;
   }
 
   /// <summary>
-  ///   Aborts the execution of callbacks registered during task submission.
+  ///   Aborts the pending task submissions a callbacks.
   /// </summary>
   /// <returns>A task representing the asynchronous operation.</returns>
-  public async Task AbortCallbacksAsync()
+  public async Task AbortSubmissionsAsync()
   {
-    var callbackRunner = TestAndSetCallbackRunner();
-    if (callbackRunner != null)
+    var backgroundSubmitter = TestAndSetBackgroundSubmitter();
+    if (backgroundSubmitter != null)
     {
-      callbackRunner.AbortCallbacks();
-      await callbackRunner.DisposeAsync()
+      await backgroundSubmitter.DisposeAsync()
                           .ConfigureAwait(false);
     }
   }
@@ -260,35 +262,133 @@ public class SessionHandle : IAsyncDisposable, IDisposable
   /// </summary>
   /// <param name="tasks">The tasks to submit</param>
   /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
-  /// <returns>An asynchronous enumeration of TaskHandle instances.</returns>
+  /// <returns>The collection of TaskHandle instances.</returns>
   /// <exception cref="ArgumentException">When the tasks parameter provided is null</exception>
-  public async IAsyncEnumerable<TaskHandle> SubmitAsync(ICollection<TaskDefinition>                tasks,
-                                                        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+  public ICollection<TaskHandle> Submit(ICollection<TaskDefinition> tasks,
+                                        CancellationToken           cancellationToken = default)
   {
     _ = tasks ?? throw new ArgumentException("Tasks parameter should not be null");
 
-    var taskInfos = ArmoniKClient.TasksService.SubmitTasksAsync(SessionInfo,
-                                                                tasks,
-                                                                cancellationToken);
-    var enumTaskDefinition = tasks.GetEnumerator();
-    await foreach (var taskInfo in taskInfos.ConfigureAwait(false))
+    var backgroundSubmitter = CreateBackgroundSubmitterIfNeeded(cancellationToken);
+    var taskHandles = new TaskHandle[tasks.Count];
+    for (int i = 0; i < tasks.Count; i++)
     {
-      enumTaskDefinition.MoveNext();
-      var taskDefinition = enumTaskDefinition.Current;
+      taskHandles[i] = TaskHandle.FromTaskCompletionSourceOfTaskInfos(new TaskCompletionSource<TaskInfos>(),
+                                                                      ArmoniKClient);
+      backgroundSubmitter.Add(tasks.ElementAt(i), taskHandles[i]);
+    }
+    return taskHandles;
+  }
 
-      var blobsWithCallbacks = taskDefinition.Outputs.Values.Where(b => b.CallBack != null);
-      if (blobsWithCallbacks.Any())
+  private class BackgroundSubmitter : IAsyncDisposable
+  {
+    /// <summary>
+    ///   Cancels any new submission.
+    /// </summary>
+    private readonly CancellationTokenSource submissionCts_;
+
+    private readonly Channel<(TaskDefinition, TaskHandle)> taskSubmissionChannel_;
+    private readonly ArmoniKClient armoniKClient_;
+    private readonly SessionInfo     sessionInfo_;
+    private readonly Task submissionTask_;
+    private bool disposed_ = false;
+
+    public BackgroundSubmitter(ArmoniKClient armoniKClient, SessionInfo sessionInfo, CancellationToken cancellationToken)
+    {
+      armoniKClient_        = armoniKClient;
+      sessionInfo_          = sessionInfo;
+      submissionCts_ = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+      taskSubmissionChannel_ = Channel.CreateUnbounded<(TaskDefinition, TaskHandle)>(new UnboundedChannelOptions
+                                                                                     {
+                                                                                       SingleReader = true,
+                                                                                       SingleWriter = true,
+                                                                                     });
+      submissionTask_ = Task.Run(RunSubmitterAsync);
+    }
+
+    public void Add(TaskDefinition taskDefinition, TaskHandle taskHandle)
+    {
+      taskSubmissionChannel_.Writer.WriteAsync((taskDefinition, taskHandle));
+    }
+
+    /// <summary>
+    ///   Wait until all registered tasks are submitted.
+    /// </summary>
+    /// <returns>
+    ///   A task representing the asynchronous operation.
+    /// </returns>
+    public async Task WaitAsync()
+    {
+      if (taskSubmissionChannel_.Writer.TryComplete())
       {
-        var callbackRunner = CreateCallbackRunnerIfNeeded(cancellationToken);
+        await submissionTask_.ConfigureAwait(false);
+        await DisposeAsync().ConfigureAwait(false);
+      }
+    }
 
-        foreach (var blob in blobsWithCallbacks)
+    private async Task RunSubmitterAsync()
+    {
+      var callbackRunner = new CallbackRunner(armoniKClient_, submissionCts_.Token);
+      try
+      {
+        await foreach (var chunk in taskSubmissionChannel_.Reader.ToAsyncEnumerable(submissionCts_.Token)
+                                                                  .ToChunksAsync(1000,
+                                                                                 TimeSpan.FromSeconds(5),
+                                                                                 submissionCts_.Token)
+                                                                  .ConfigureAwait(false))
         {
-          callbackRunner.Add(blob);
+          var taskInfos = armoniKClient_.TasksService.SubmitTasksAsync(sessionInfo_,
+                                                                       chunk.ViewSelect(tuple => tuple.Item1),
+                                                                       submissionCts_.Token);
+
+          var enumTask = chunk.AsEnumerable().GetEnumerator();
+          await foreach (var taskInfo in taskInfos.ConfigureAwait(false))
+          {
+            enumTask.MoveNext();
+            var taskDefinition = enumTask.Current.Item1;
+            var taskHandle = enumTask.Current.Item2;
+            taskHandle.TaskInfosSource!.SetResult(taskInfo);
+
+            var blobsWithCallbacks = taskDefinition.Outputs.Values.Where(b => b.CallBack != null);
+            if (blobsWithCallbacks.Any())
+            {
+              foreach (var blob in blobsWithCallbacks)
+              {
+                callbackRunner.Add(blob);
+              }
+            }
+          }
         }
       }
+      catch (OperationCanceledException)
+      {
+      }
+      finally
+      {
+        // If submission was canceled, callbacks were canceled too,
+        // then there is no need to wait the callback runner to complete.
+        if (!submissionCts_.Token.IsCancellationRequested)
+        {
+          await callbackRunner.WaitAsync().ConfigureAwait(false);
+        }
+        await callbackRunner.DisposeAsync().ConfigureAwait(false);
+      }
+    }
 
-      yield return new TaskHandle(ArmoniKClient,
-                                  taskInfo);
+    public async ValueTask DisposeAsync()
+    {
+      if (!disposed_)
+      {
+        disposed_ = true;
+
+        // Send an abort signal
+        submissionCts_.Cancel();
+
+        // Wait for the worker task to complete
+        await submissionTask_.ConfigureAwait(false);
+
+        submissionCts_.Dispose();
+      }
     }
   }
 

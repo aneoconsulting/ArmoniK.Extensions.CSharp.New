@@ -35,7 +35,12 @@ public class TaskHandle
   /// <summary>
   ///   Gets the task information for which this handle will perform operations.
   /// </summary>
-  private readonly TaskInfos taskInfos_;
+  private readonly TaskInfos? taskInfos_;
+
+  /// <summary>
+  /// The TaskCompletionSource valued by the task submission.
+  /// </summary>
+  internal TaskCompletionSource<TaskInfos>? TaskInfosSource { get; set; }
 
   /// <summary>
   ///   Initializes a new instance of the <see cref="TaskHandle" /> class with a specified ArmoniK client and task
@@ -43,26 +48,19 @@ public class TaskHandle
   /// </summary>
   /// <param name="armoniKClient">The ArmoniK client to be used for task service operations.</param>
   /// <param name="taskInfo">The task information related to the tasks that will be handled.</param>
+  /// <param name="source">The task information related to the tasks that will be handled.</param>
   /// <exception cref="ArgumentNullException">Thrown when armoniKClient or taskInfo is null.</exception>
-  public TaskHandle(ArmoniKClient armoniKClient,
-                    TaskInfos     taskInfo)
+  private TaskHandle(ArmoniKClient armoniKClient,
+                    TaskInfos?     taskInfo,
+                    TaskCompletionSource<TaskInfos>? source)
   {
-    ArmoniKClient = armoniKClient ?? throw new ArgumentNullException(nameof(armoniKClient));
-    taskInfos_    = taskInfo      ?? throw new ArgumentNullException(nameof(taskInfo));
+    ArmoniKClient = armoniKClient;
+    taskInfos_ = taskInfo;
+    TaskInfosSource = source;
   }
 
   /// <summary>
-  ///   Implicit conversion operator from TaskHandle to TaskInfos.
-  ///   Allows TaskHandle to be used wherever TaskInfos is expected.
-  /// </summary>
-  /// <param name="taskHandle">The TaskHandle to convert.</param>
-  /// <returns>The TaskInfos contained within the TaskHandle.</returns>
-  /// <exception cref="ArgumentNullException">Thrown when taskHandle is null.</exception>
-  public static implicit operator TaskInfos(TaskHandle taskHandle)
-    => taskHandle?.taskInfos_ ?? throw new ArgumentNullException(nameof(taskHandle));
-
-  /// <summary>
-  ///   Creates a TaskHandle from TaskInfos and ArmoniKClient.
+  ///   Creates a TaskHandle from a TaskInfos and ArmoniKClient.
   /// </summary>
   /// <param name="taskInfos">The TaskInfos to wrap.</param>
   /// <param name="armoniKClient">The ArmoniK client for operations.</param>
@@ -71,7 +69,34 @@ public class TaskHandle
   public static TaskHandle FromTaskInfos(TaskInfos     taskInfos,
                                          ArmoniKClient armoniKClient)
     => new(armoniKClient ?? throw new ArgumentNullException(nameof(armoniKClient)),
-           taskInfos     ?? throw new ArgumentNullException(nameof(taskInfos)));
+           taskInfos     ?? throw new ArgumentNullException(nameof(taskInfos)),
+           null);
+
+  /// <summary>
+  /// Creates a TaskHandle from a TaskCompletionSource and ArmoniKClient.
+  /// </summary>
+  /// <param name="source">The TaskInfos's source</param>
+  /// <param name="armoniKClient">The ArmoniK client for operations.</param>
+  /// <returns>A new TaskHandle instance.</returns>
+  /// <exception cref="ArgumentNullException">Thrown when source or armoniKClient is null.</exception>
+  public static TaskHandle FromTaskCompletionSourceOfTaskInfos(TaskCompletionSource<TaskInfos> source,
+                                                               ArmoniKClient armoniKClient)
+  => new(armoniKClient ?? throw new ArgumentNullException(nameof(armoniKClient)),
+         null,
+         source ?? throw new ArgumentNullException(nameof(source)));
+
+  /// <summary>
+  ///   Get the TaskInfo instance.
+  /// </summary>
+  /// <returns>The task's TaskInfo instance</returns>
+  public async Task<TaskInfos> GetTaskInfosAsync()
+  {
+    if (TaskInfosSource != null)
+    {
+      return await TaskInfosSource.Task.ConfigureAwait(false);
+    }
+    return taskInfos_!;
+  }
 
   /// <summary>
   ///   Asynchronously retrieves detailed state information about the task associated with this handle.
