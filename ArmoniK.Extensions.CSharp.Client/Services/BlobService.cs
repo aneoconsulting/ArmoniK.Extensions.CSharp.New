@@ -89,39 +89,37 @@ public class BlobService : IBlobService
                                                                    IEnumerable<(string name, bool manualDeletion)> names,
                                                                    [EnumeratorCancellation] CancellationToken      cancellationToken = default)
   {
-    await using var channel = await channelPool_.GetAsync(cancellationToken)
-                                                .ConfigureAwait(false);
-    var blobClient = new Results.ResultsClient(channel);
-
-    var resultsCreate = names.Select(blob => new CreateResultsMetaDataRequest.Types.ResultCreate
-                                             {
-                                               Name           = blob.name,
-                                               ManualDeletion = blob.manualDeletion,
-                                             });
-
-    var blobsCreationResponse = await blobClient.CreateResultsMetaDataAsync(new CreateResultsMetaDataRequest
-                                                                            {
-                                                                              SessionId = session.SessionId,
-                                                                              Results =
-                                                                              {
-                                                                                resultsCreate,
-                                                                              },
-                                                                            },
-                                                                            cancellationToken: cancellationToken)
-                                                .ConfigureAwait(false);
-
-    var asyncBlobInfos = blobsCreationResponse.Results.Select(b => new BlobInfo
-                                                                   {
-                                                                     BlobName  = b.Name,
-                                                                     BlobId    = b.ResultId,
-                                                                     SessionId = session.SessionId,
-                                                                   })
-                                              .ToAsyncEnumerable();
-
-    await foreach (var blobInfo in asyncBlobInfos.WithCancellation(cancellationToken)
-                                                 .ConfigureAwait(false))
+    foreach (var chunk in names.ToChunks(1000))
     {
-      yield return blobInfo;
+      var resultsCreate = chunk.Select(blob => new CreateResultsMetaDataRequest.Types.ResultCreate
+                                               {
+                                                 Name           = blob.name,
+                                                 ManualDeletion = blob.manualDeletion,
+                                               });
+
+      var blobsCreationResponse = await channelPool_.WithInstanceAsync(async channel => await new Results.ResultsClient(channel)
+                                                                                              .CreateResultsMetaDataAsync(new CreateResultsMetaDataRequest
+                                                                                                                          {
+                                                                                                                            SessionId = session.SessionId,
+                                                                                                                            Results =
+                                                                                                                            {
+                                                                                                                              resultsCreate,
+                                                                                                                            },
+                                                                                                                          },
+                                                                                                                          cancellationToken: cancellationToken)
+                                                                                              .ConfigureAwait(false),
+                                                                       cancellationToken)
+                                                    .ConfigureAwait(false);
+
+      foreach (var blob in blobsCreationResponse.Results)
+      {
+        yield return new BlobInfo
+                     {
+                       BlobName  = blob.Name,
+                       BlobId    = blob.ResultId,
+                       SessionId = session.SessionId,
+                     };
+      }
     }
   }
 
@@ -285,30 +283,44 @@ public class BlobService : IBlobService
   }
 
   /// <inheritdoc />
-  public async Task<ICollection<BlobState>> ImportBlobDataAsync(SessionInfo                                 session,
-                                                                IEnumerable<KeyValuePair<BlobInfo, byte[]>> blobDescs,
-                                                                CancellationToken                           cancellationToken = default)
+  public async IAsyncEnumerable<BlobState> ImportBlobDataAsync(SessionInfo                                 session,
+                                                               IEnumerable<KeyValuePair<BlobInfo, byte[]>> blobDescs,
+                                                               [EnumeratorCancellation] CancellationToken  cancellationToken = default)
   {
-    await using var channel = await channelPool_.GetAsync(cancellationToken)
-                                                .ConfigureAwait(false);
-    var blobClient = new Results.ResultsClient(channel);
-    var request = new ImportResultsDataRequest
-                  {
-                    SessionId = session.SessionId,
-                  };
-    foreach (var blobDesc in blobDescs)
+    if (serviceConfiguration_ is null)
     {
-      request.Results.Add(new ResultOpaqueId
-                          {
-                            ResultId = blobDesc.Key.BlobId,
-                            OpaqueId = ByteString.CopyFrom(blobDesc.Value),
-                          });
+      await LoadBlobServiceConfigurationAsync(cancellationToken)
+        .ConfigureAwait(false);
     }
 
-    var response = await blobClient.ImportResultsDataAsync(request)
-                                   .ConfigureAwait(false);
-    return response.Results.Select(resultRaw => resultRaw.ToBlobState())
-                   .AsICollection();
+    // This is a bin packing kind of problem for which we apply the first-fit-decreasing strategy
+    var batches = GetOptimizedBatches(blobDescs,
+                                      pair => pair.Key.BlobId.Length + pair.Value.Length,
+                                      serviceConfiguration_!.DataChunkMaxSize);
+    foreach (var batch in batches)
+    {
+      var request = new ImportResultsDataRequest
+                    {
+                      SessionId = session.SessionId,
+                    };
+      foreach (var blobDesc in batch.Items)
+      {
+        request.Results.Add(new ResultOpaqueId
+                            {
+                              ResultId = blobDesc.Key.BlobId,
+                              OpaqueId = ByteString.CopyFrom(blobDesc.Value),
+                            });
+      }
+
+      var response = await channelPool_.WithInstanceAsync(async channel => await new Results.ResultsClient(channel).ImportResultsDataAsync(request)
+                                                                                                                   .ConfigureAwait(false),
+                                                          cancellationToken)
+                                       .ConfigureAwait(false);
+      foreach (var resultRaw in response.Results)
+      {
+        yield return resultRaw.ToBlobState();
+      }
+    }
   }
 
   /// <inheritdoc />
@@ -645,6 +657,7 @@ public class BlobService : IBlobService
 
     // This is a bin packing kind of problem for which we apply the first-fit-decreasing strategy
     var batches = GetOptimizedBatches(blobDefinitions,
+                                      blobDefinition => blobDefinition.TotalSize,
                                       serviceConfiguration_!.DataChunkMaxSize);
 
     await using var channel = await channelPool_.GetAsync(cancellationToken)
@@ -703,20 +716,22 @@ public class BlobService : IBlobService
   ///   Dispatches a list of blob definitions in a minimal number of batches, each batch size being less than the 'maxSize'
   /// </summary>
   /// <param name="blobDefinitions">The list of blob definitions to dispatch</param>
+  /// <param name="getTotalSize">The function returning the size of the element of type T</param>
   /// <param name="maxSize">The maximum size for a batch</param>
   /// <returns>The list of batches created</returns>
-  private static List<Batch> GetOptimizedBatches(IEnumerable<BlobDefinition> blobDefinitions,
-                                                 int                         maxSize)
+  private static List<Batch<T>> GetOptimizedBatches<T>(IEnumerable<T> blobDefinitions,
+                                                       Func<T, long>  getTotalSize,
+                                                       int            maxSize)
   {
-    var blobsByDescendingSize = blobDefinitions.OrderByDescending(b => b.TotalSize)
+    var blobsByDescendingSize = blobDefinitions.OrderByDescending(b => getTotalSize(b))
                                                .ToList();
-    var batches = new List<Batch>();
+    var batches = new List<Batch<T>>();
     foreach (var blob in blobsByDescendingSize)
     {
-      var batch = batches.FirstOrDefault(b => maxSize > b.Size + blob.TotalSize);
+      var batch = batches.FirstOrDefault(b => maxSize > b.Size + getTotalSize(blob));
       if (batch == null)
       {
-        batch = new Batch();
+        batch = new Batch<T>(getTotalSize);
         batches.Add(batch);
       }
 
@@ -726,16 +741,21 @@ public class BlobService : IBlobService
     return batches;
   }
 
-  private class Batch
+  private class Batch<T>
   {
-    public List<BlobDefinition> Items { get; } = new();
+    private readonly Func<T, long> getTotalSize_;
+
+    public Batch(Func<T, long> getTotalSize)
+      => getTotalSize_ = getTotalSize;
+
+    public List<T> Items { get; } = new();
 
     public long Size { get; private set; }
 
-    public void AddItem(BlobDefinition item)
+    public void AddItem(T item)
     {
       Items.Add(item);
-      Size += item.TotalSize;
+      Size += getTotalSize_(item);
     }
   }
 

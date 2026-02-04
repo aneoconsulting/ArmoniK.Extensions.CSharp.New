@@ -47,6 +47,7 @@ public class TaskSdkClient : ClientBase
                                                                        .WithCallback(callback))
                                              .WithTaskOptions(TaskConfiguration!);
     await SessionHandle!.SubmitAsync([taskDefinition])
+                        .SingleAsync()
                         .ConfigureAwait(false);
 
     await SessionHandle.WaitCallbacksAsync()
@@ -92,6 +93,7 @@ public class TaskSdkClient : ClientBase
     }
 
     await SessionHandle!.SubmitAsync(taskDefinitions)
+                        .LastOrDefaultAsync()
                         .ConfigureAwait(false);
     await SessionHandle.WaitCallbacksAsync()
                        .ConfigureAwait(false);

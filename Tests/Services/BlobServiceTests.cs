@@ -709,10 +709,12 @@ public class BlobServiceTests
                                },
                              },
                            };
+    client.CallInvokerMock.ConfigureBlobService();
     client.CallInvokerMock.SetupAsyncUnaryCallInvokerMock<ImportResultsDataRequest, ImportResultsDataResponse>(expectedResponse);
 
     var result = await client.BlobService.ImportBlobDataAsync(sessionInfo,
                                                               blobDescs)
+                             .ToArrayAsync()
                              .ConfigureAwait(false);
 
     var blobState = result.Single();

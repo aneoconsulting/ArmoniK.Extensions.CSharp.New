@@ -152,30 +152,32 @@ public class TasksService : ITasksService
   }
 
   /// <inheritdoc />
-  public async Task<ICollection<TaskState>> CancelTasksAsync(IEnumerable<string> taskIds,
-                                                             CancellationToken   cancellationToken = default)
+  public async IAsyncEnumerable<TaskState> CancelTasksAsync(IEnumerable<string>                        taskIds,
+                                                            [EnumeratorCancellation] CancellationToken cancellationToken = default)
   {
-    await using var channel = await channelPool_.GetAsync(cancellationToken)
-                                                .ConfigureAwait(false);
-
-    var tasksClient = new Tasks.TasksClient(channel);
-
-    var response = await tasksClient.CancelTasksAsync(new CancelTasksRequest
-                                                      {
-                                                        TaskIds =
-                                                        {
-                                                          taskIds,
-                                                        },
-                                                      })
-                                    .ConfigureAwait(false);
-    return response.Tasks.Select(taskSummary => taskSummary.ToTaskState())
-                   .AsICollection();
+    foreach (var chunk in taskIds.ToChunks(1000))
+    {
+      var response = await channelPool_.WithInstanceAsync(async channel => await new Tasks.TasksClient(channel).CancelTasksAsync(new CancelTasksRequest
+                                                                                                                                 {
+                                                                                                                                   TaskIds =
+                                                                                                                                   {
+                                                                                                                                     chunk,
+                                                                                                                                   },
+                                                                                                                                 })
+                                                                                                               .ConfigureAwait(false),
+                                                          cancellationToken)
+                                       .ConfigureAwait(false);
+      foreach (var task in response.Tasks)
+      {
+        yield return task.ToTaskState();
+      }
+    }
   }
 
   /// <inheritdoc />
-  public async Task<ICollection<TaskInfos>> SubmitTasksAsync(SessionInfo                 session,
-                                                             ICollection<TaskDefinition> taskDefinitions,
-                                                             CancellationToken           cancellationToken = default)
+  public async IAsyncEnumerable<TaskInfos> SubmitTasksAsync(SessionInfo                                session,
+                                                            ICollection<TaskDefinition>                taskDefinitions,
+                                                            [EnumeratorCancellation] CancellationToken cancellationToken = default)
   {
     // Validate each task node
     if (taskDefinitions.Any(node => !node.Outputs.Any()))
@@ -263,24 +265,28 @@ public class TasksService : ITasksService
     }
 
     // Task submission
-    await using var channel = await channelPool_.GetAsync(cancellationToken)
-                                                .ConfigureAwait(false);
-    var tasksClient = new Tasks.TasksClient(channel);
-    var submitTasksRequest = new SubmitTasksRequest
-                             {
-                               SessionId = session.SessionId,
-                               TaskCreations =
+    foreach (var chunk in taskCreations.ToChunks(1000))
+    {
+      var submitTasksRequest = new SubmitTasksRequest
                                {
-                                 taskCreations,
-                               },
-                             };
+                                 SessionId = session.SessionId,
+                                 TaskCreations =
+                                 {
+                                   chunk,
+                                 },
+                               };
+      var taskSubmissionResponse = await channelPool_.WithInstanceAsync(async channel => await new Tasks.TasksClient(channel).SubmitTasksAsync(submitTasksRequest,
+                                                                                                                                               cancellationToken:
+                                                                                                                                               cancellationToken)
+                                                                                                                             .ConfigureAwait(false),
+                                                                        cancellationToken)
+                                                     .ConfigureAwait(false);
 
-    var taskSubmissionResponse = await tasksClient.SubmitTasksAsync(submitTasksRequest,
-                                                                    cancellationToken: cancellationToken)
-                                                  .ConfigureAwait(false);
-
-    return taskSubmissionResponse.TaskInfos.Select(x => x.ToTaskInfos(session.SessionId))
-                                 .AsICollection();
+      foreach (var task in taskSubmissionResponse.TaskInfos)
+      {
+        yield return task.ToTaskInfos(session.SessionId);
+      }
+    }
   }
 
   private class Payload

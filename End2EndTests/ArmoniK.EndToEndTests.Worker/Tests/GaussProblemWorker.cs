@@ -121,6 +121,7 @@ public class GaussProblemWorker : IWorker
     await taskHandler.SubmitTasksAsync(allTaskDefinitions,
                                        taskHandler.TaskOptions,
                                        cancellationToken)
+                     .LastOrDefaultAsync(cancellationToken)
                      .ConfigureAwait(false);
   }
 

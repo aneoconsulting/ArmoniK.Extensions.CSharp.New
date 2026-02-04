@@ -108,6 +108,7 @@ internal class Program
 
     var taskHandle = await sessionHandle.SubmitAsync([task],
                                                      CancellationToken.None)
+                                        .SingleAsync()
                                         .ConfigureAwait(false);
 
     BlobInfo resultBlobInfo = task.Outputs.Values.First()
@@ -115,7 +116,7 @@ internal class Program
     logger.LogInformation("resultId: {ResultId}",
                           resultBlobInfo.BlobId);
     logger.LogInformation("taskId: {TaskId}",
-                          ((TaskInfos)taskHandle.First()).TaskId);
+                          ((TaskInfos)taskHandle).TaskId);
 
     await eventsService.WaitForBlobsAsync(sessionHandle,
                                           [resultBlobInfo])

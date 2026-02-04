@@ -26,6 +26,9 @@ using ArmoniK.Extensions.CSharp.Client.Common.Domain.Session;
 using ArmoniK.Extensions.CSharp.Client.Common.Domain.Task;
 using ArmoniK.Extensions.CSharp.Client.Common.Enum;
 using ArmoniK.Extensions.CSharp.Common.Common.Domain.Task;
+using ArmoniK.Utils;
+
+using TaskStatus = ArmoniK.Extensions.CSharp.Common.Common.Domain.Task.TaskStatus;
 
 namespace ArmoniK.Extensions.CSharp.Client.Common.Services;
 
@@ -40,10 +43,10 @@ public interface ITasksService
   /// <param name="session">The session information to which the tasks belong.</param>
   /// <param name="taskDefinitions">The task definitions.</param>
   /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
-  /// <returns>A task representing the asynchronous operation. The task result contains an enumerable of task information.</returns>
-  Task<ICollection<TaskInfos>> SubmitTasksAsync(SessionInfo                 session,
-                                                ICollection<TaskDefinition> taskDefinitions,
-                                                CancellationToken           cancellationToken = default);
+  /// <returns>An asynchronous enumerable of task infos.</returns>
+  IAsyncEnumerable<TaskInfos> SubmitTasksAsync(SessionInfo                 session,
+                                               ICollection<TaskDefinition> taskDefinitions,
+                                               CancellationToken           cancellationToken = default);
 
   /// <summary>
   ///   Asynchronously lists tasks based on pagination options.
@@ -79,9 +82,9 @@ public interface ITasksService
   /// </summary>
   /// <param name="taskIds">The identifiers of the tasks to cancel.</param>
   /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
-  /// <returns>A task representing the asynchronous operation. The task result contains an enumerable of task state.</returns>
-  Task<ICollection<TaskState>> CancelTasksAsync(IEnumerable<string> taskIds,
-                                                CancellationToken   cancellationToken = default);
+  /// <returns>An asynchronous enumerable of detailed task states.</returns>
+  IAsyncEnumerable<TaskState> CancelTasksAsync(IEnumerable<string> taskIds,
+                                               CancellationToken   cancellationToken = default);
 }
 
 /// <summary>
@@ -96,46 +99,52 @@ public static class TasksServiceExt
   /// <param name="taskIds">The identifiers of the tasks to retrieve.</param>
   /// <param name="pageSize">The number of tasks to retrieve per page.</param>
   /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
-  /// <returns>An asynchronous enumerable of task pages.</returns>
-  public static async IAsyncEnumerable<TaskPage> GetTasksAsync(this ITasksService                         taskService,
-                                                               IEnumerable<string>                        taskIds,
-                                                               int                                        pageSize          = 50,
-                                                               [EnumeratorCancellation] CancellationToken cancellationToken = default)
+  /// <returns>An asynchronous enumerable of a task id and its status.</returns>
+  public static async IAsyncEnumerable<(string blobId, TaskStatus status)> GetTasksAsync(this ITasksService                         taskService,
+                                                                                         IEnumerable<string>                        taskIds,
+                                                                                         int                                        pageSize          = 50,
+                                                                                         [EnumeratorCancellation] CancellationToken cancellationToken = default)
   {
-    var taskPagination = new TaskPagination
-                         {
-                           Filter = new Filters
-                                    {
-                                      Or =
-                                      {
-                                        taskIds.Select(TaskIdFilter),
-                                      },
-                                    },
-                           Page          = 0,
-                           PageSize      = pageSize,
-                           SortDirection = SortDirection.Asc,
-                         };
-
-    var                        total     = 0;
-    var                        firstPage = true;
-    IAsyncEnumerable<TaskPage> res;
-    while (await (res = taskService.ListTasksAsync(taskPagination,
-                                                   cancellationToken)).AnyAsync(cancellationToken)
-                                                                      .ConfigureAwait(false))
+    foreach (var chunk in taskIds.ToChunks(1000))
     {
-      await foreach (var taskPage in res.WithCancellation(cancellationToken)
-                                        .ConfigureAwait(false))
+      var taskPagination = new TaskPagination
+                           {
+                             Filter = new Filters
+                                      {
+                                        Or =
+                                        {
+                                          chunk.Select(TaskIdFilter),
+                                        },
+                                      },
+                             Page          = 0,
+                             PageSize      = pageSize,
+                             SortDirection = SortDirection.Asc,
+                           };
+
+      var                        total     = 0;
+      var                        firstPage = true;
+      IAsyncEnumerable<TaskPage> res;
+      while (await (res = taskService.ListTasksAsync(taskPagination,
+                                                     cancellationToken)).AnyAsync(cancellationToken)
+                                                                        .ConfigureAwait(false))
       {
-        if (firstPage)
+        await foreach (var taskPage in res.WithCancellation(cancellationToken)
+                                          .ConfigureAwait(false))
         {
-          total     = taskPage.TotalTasks;
-          firstPage = false;
+          if (firstPage)
+          {
+            total     = taskPage.TotalTasks;
+            firstPage = false;
+          }
+
+          foreach (var pair in taskPage.TasksData)
+          {
+            yield return (pair.Item1, pair.Item2);
+          }
         }
 
-        yield return taskPage;
+        taskPagination.Page++;
       }
-
-      taskPagination.Page++;
     }
   }
 

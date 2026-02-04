@@ -82,6 +82,7 @@ internal class CheckBlobCreationResponseOrderWorker : IWorker
       await taskHandler.SubmitTasksAsync([taskDefinition],
                                          taskHandler.TaskOptions,
                                          cancellationToken)
+                       .ToArrayAsync()
                        .ConfigureAwait(false);
     }
 

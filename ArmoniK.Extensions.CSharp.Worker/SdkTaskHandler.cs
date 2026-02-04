@@ -178,10 +178,10 @@ internal class SdkTaskHandler : ISdkTaskHandler
   ///   Token used to cancel the execution of the method.
   ///   If null, the cancellation token of the task handler is used
   /// </param>
-  /// <returns>A task representing the asynchronous operation. The task result contains the collection of TaskInfos</returns>
-  public async Task<ICollection<TaskInfos>> SubmitTasksAsync(ICollection<TaskDefinition> taskDefinitions,
-                                                             TaskConfiguration           submissionTaskOptions,
-                                                             CancellationToken           cancellationToken = default)
+  /// <returns>An asynchronous enumerable of task infos.</returns>
+  public async IAsyncEnumerable<TaskInfos> SubmitTasksAsync(ICollection<TaskDefinition>                taskDefinitions,
+                                                            TaskConfiguration                          submissionTaskOptions,
+                                                            [EnumeratorCancellation] CancellationToken cancellationToken = default)
   {
     // Create all input and output blobs
     var allBlobDefinitions = taskDefinitions.SelectMany(t => t.InputDefinitions.Values.Union(t.OutputDefinitions.Values));
@@ -236,14 +236,19 @@ internal class SdkTaskHandler : ISdkTaskHandler
                         });
     }
 
-    // Send the request
-    var response = await taskHandler_.SubmitTasksAsync(taskCreations,
-                                                       submissionTaskOptions.ToTaskOptions(),
-                                                       cancellationToken)
-                                     .ConfigureAwait(false);
+    foreach (var chunk in taskCreations.ToChunks(1000))
+    {
+      // Send the request
+      var response = await taskHandler_.SubmitTasksAsync(chunk,
+                                                         submissionTaskOptions.ToTaskOptions(),
+                                                         cancellationToken)
+                                       .ConfigureAwait(false);
 
-    return response.TaskInfos.Select(t => t.ToTaskInfos(taskHandler_.SessionId))
-                   .AsICollection();
+      foreach (var task in response.TaskInfos)
+      {
+        yield return task.ToTaskInfos(taskHandler_.SessionId);
+      }
+    }
   }
 
   private async Task CreateBlobsAsync(IEnumerable<BlobDefinition> blobs,
@@ -294,19 +299,22 @@ internal class SdkTaskHandler : ISdkTaskHandler
       // Creation of blobs without data
       foreach (var blobsWithoutDuplicateName in DeDuplicateWithName(blobsWithoutData))
       {
-        var name2Blob = blobsWithoutDuplicateName.ToDictionary(b => b.Name,
-                                                               b => b);
-        var blobsCreate = blobsWithoutDuplicateName.Select(b => new CreateResultsMetaDataRequest.Types.ResultCreate
-                                                                {
-                                                                  Name = b.Name,
-                                                                });
-        var response = await taskHandler_.CreateResultsMetaDataAsync(blobsCreate,
-                                                                     cancellationToken)
-                                         .ConfigureAwait(false);
-        foreach (var blob in response.Results)
+        foreach (var chunk in blobsWithoutDuplicateName.ToChunks(1000))
         {
-          name2Blob[blob.Name].BlobHandle = new BlobHandle(blob.ResultId,
-                                                           this);
+          var name2Blob = blobsWithoutDuplicateName.ToDictionary(b => b.Name,
+                                                                 b => b);
+          var blobsCreate = blobsWithoutDuplicateName.Select(b => new CreateResultsMetaDataRequest.Types.ResultCreate
+                                                                  {
+                                                                    Name = b.Name,
+                                                                  });
+          var response = await taskHandler_.CreateResultsMetaDataAsync(blobsCreate,
+                                                                       cancellationToken)
+                                           .ConfigureAwait(false);
+          foreach (var blob in response.Results)
+          {
+            name2Blob[blob.Name].BlobHandle = new BlobHandle(blob.ResultId,
+                                                             this);
+          }
         }
       }
     }
