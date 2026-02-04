@@ -105,15 +105,14 @@ public class TasksServiceTests
                              .ToArrayAsync()
                              .ConfigureAwait(false);
 
-    var taskInfosEnumerable = result ?? result.ToArray();
     Assert.Multiple(() =>
                     {
-                      Assert.That(taskInfosEnumerable[0].DataDependencies,
+                      Assert.That(result[0].DataDependencies,
                                   Is.EquivalentTo(new[]
                                                   {
                                                     blob.blobId,
                                                   }));
-                      Assert.That(taskInfosEnumerable[1].DataDependencies,
+                      Assert.That(result[1].DataDependencies,
                                   Is.EquivalentTo(new[]
                                                   {
                                                     blob.blobId,
@@ -158,22 +157,21 @@ public class TasksServiceTests
                              .ToArrayAsync()
                              .ConfigureAwait(false);
 
-    var taskInfosEnumerable = result ?? result.ToArray();
     Assert.Multiple(() =>
                     {
-                      Assert.That(taskInfosEnumerable.Length,
+                      Assert.That(result.Length,
                                   Is.EqualTo(1),
                                   "Expected one task info in the response.");
-                      Assert.That(taskInfosEnumerable.First()
-                                                     .TaskId,
+                      Assert.That(result.First()
+                                        .TaskId,
                                   Is.EqualTo(task.taskId),
                                   "Expected task ID to match.");
-                      Assert.That(taskInfosEnumerable.First()
-                                                     .PayloadId,
+                      Assert.That(result.First()
+                                        .PayloadId,
                                   Is.EqualTo(task.payloadId),
                                   "Expected payload ID to match.");
-                      Assert.That(taskInfosEnumerable.First()
-                                                     .ExpectedOutputs.First(),
+                      Assert.That(result.First()
+                                        .ExpectedOutputs.First(),
                                   Is.EqualTo(outputBlob.blobId),
                                   "Expected blob ID to match.");
                     });

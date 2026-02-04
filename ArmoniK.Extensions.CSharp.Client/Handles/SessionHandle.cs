@@ -260,10 +260,10 @@ public class SessionHandle : IAsyncDisposable, IDisposable
   /// </summary>
   /// <param name="tasks">The tasks to submit</param>
   /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
-  /// <returns>A task representing the asynchronous operation.</returns>
+  /// <returns>An asynchronous enumeration of TaskHandle instances.</returns>
   /// <exception cref="ArgumentException">When the tasks parameter provided is null</exception>
-  public async Task SubmitAsync(ICollection<TaskDefinition> tasks,
-                                CancellationToken           cancellationToken = default)
+  public async IAsyncEnumerable<TaskHandle> SubmitAsync(ICollection<TaskDefinition>                tasks,
+                                                        [EnumeratorCancellation] CancellationToken cancellationToken = default)
   {
     _ = tasks ?? throw new ArgumentException("Tasks parameter should not be null");
 
@@ -287,8 +287,8 @@ public class SessionHandle : IAsyncDisposable, IDisposable
         }
       }
 
-      taskDefinition.TaskHandle = new TaskHandle(ArmoniKClient,
-                                                 taskInfo);
+      yield return new TaskHandle(ArmoniKClient,
+                                  taskInfo);
     }
   }
 

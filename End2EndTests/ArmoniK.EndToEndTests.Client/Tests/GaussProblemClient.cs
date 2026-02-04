@@ -56,6 +56,7 @@ public class GaussProblemClient : ClientBase
     }
 
     await SessionHandle!.SubmitAsync([task])
+                        .SingleAsync()
                         .ConfigureAwait(false);
 
     await SessionHandle.WaitCallbacksAsync()
