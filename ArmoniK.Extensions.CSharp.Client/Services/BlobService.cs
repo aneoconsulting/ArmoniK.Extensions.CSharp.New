@@ -197,12 +197,6 @@ public class BlobService : IBlobService
                                                ReadOnlyMemory<byte> blobContent,
                                                CancellationToken    cancellationToken = default)
   {
-    if (serviceConfiguration_ is null)
-    {
-      await LoadBlobServiceConfigurationAsync(cancellationToken)
-        .ConfigureAwait(false);
-    }
-
     var content = new[]
                   {
                     blobContent,
@@ -446,6 +440,12 @@ public class BlobService : IBlobService
   {
     try
     {
+      if (serviceConfiguration_ is null)
+      {
+        await LoadBlobServiceConfigurationAsync(cancellationToken)
+          .ConfigureAwait(false);
+      }
+
       await using var channel = await channelPool_.GetAsync(cancellationToken)
                                                   .ConfigureAwait(false);
       var blobClient = new Results.ResultsClient(channel);
@@ -563,8 +563,8 @@ public class BlobService : IBlobService
   /// <param name="source">The input enumerable</param>
   /// <param name="maxSize">The max size of the of the output's chunks</param>
   /// <returns>The enumerable of resized elements</returns>
-  private static async IAsyncEnumerable<ReadOnlyMemory<byte>> Resize(IAsyncEnumerable<ReadOnlyMemory<byte>> source,
-                                                                     int                                    maxSize)
+  internal static async IAsyncEnumerable<ReadOnlyMemory<byte>> Resize(IAsyncEnumerable<ReadOnlyMemory<byte>> source,
+                                                                      int                                    maxSize)
   {
     ReadOnlyMemory<byte>? previousSegment = null;
     // We iterate over the enumeration's elements (called segments here) which are split in chunks when necessary
