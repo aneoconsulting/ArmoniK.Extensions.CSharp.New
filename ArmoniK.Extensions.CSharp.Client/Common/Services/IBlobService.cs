@@ -114,16 +114,26 @@ public interface IBlobService
                                                        CancellationToken cancellationToken = default);
 
   /// <summary>
+  ///   Asynchronously uploads a blob's content.
+  /// </summary>
+  /// <param name="blobInfo">The information of the blob to upload.</param>
+  /// <param name="blobContent">The content to upload.</param>
+  /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
+  /// <returns>A task representing the asynchronous operation. The task result contains the blob's BlobState after uploading.</returns>
+  Task<BlobState> UploadBlobAsync(BlobInfo             blobInfo,
+                                  ReadOnlyMemory<byte> blobContent,
+                                  CancellationToken    cancellationToken = default);
+
+  /// <summary>
   ///   Asynchronously uploads the content chunks of a blob.
   /// </summary>
   /// <param name="blobInfo">The information of the blob to upload.</param>
   /// <param name="blobContent">The content chunks to upload.</param>
   /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
-  /// <returns>A task representing the asynchronous operation.</returns>
-  Task UploadBlobAsync(BlobInfo             blobInfo,
-                       ReadOnlyMemory<byte> blobContent,
-                       CancellationToken    cancellationToken = default);
-
+  /// <returns>A task representing the asynchronous operation. The task result contains the blob's BlobState after uploading.</returns>
+  Task<BlobState> UploadBlobAsync(BlobInfo                               blobInfo,
+                                  IAsyncEnumerable<ReadOnlyMemory<byte>> blobContent,
+                                  CancellationToken                      cancellationToken = default);
 
   /// <summary>
   ///   Asynchronously retrieves the state of a blob.

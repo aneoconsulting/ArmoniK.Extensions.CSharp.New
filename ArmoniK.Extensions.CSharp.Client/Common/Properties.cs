@@ -49,6 +49,9 @@ public record Properties
   private const string SectionRetryBackoffMultiplier = "RetryBackoffMultiplier";
   private const string SectionRetryMaxBackoff        = "RetryMaxBackoff";
 
+  private const string SectionParallelismLimit  = "ParallelismLimit";
+  private const string SectionRetryRequestCount = "RetryRequestCount";
+
   /// <summary>
   ///   The constructor to instantiate Properties object
   /// </summary>
@@ -115,8 +118,10 @@ public record Properties
     var sectionApplicationConfig = configuration.GetSection("ApplicationConfig");
     if (sectionApplicationConfig != null)
     {
-      ParallelismLimit = sectionApplicationConfig.GetValue("ParallelismLimit",
+      ParallelismLimit = sectionApplicationConfig.GetValue(SectionParallelismLimit,
                                                            0);
+      RetryRequestCount = sectionApplicationConfig.GetValue(SectionRetryRequestCount,
+                                                            3);
     }
 
     var sectionGrpc = configuration.GetSection(Grpc);
@@ -210,6 +215,11 @@ public record Properties
   ///   Maximum parallelism limit for fetching results
   /// </summary>
   public int ParallelismLimit { get; set; }
+
+  /// <summary>
+  ///   Maximum retry count when a streamed request fails
+  /// </summary>
+  public int RetryRequestCount { get; set; }
 
   /// <summary>
   ///   The control plane url to connect
