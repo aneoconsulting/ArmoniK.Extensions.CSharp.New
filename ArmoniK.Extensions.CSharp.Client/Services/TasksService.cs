@@ -103,7 +103,7 @@ public class TasksService : ITasksService
 
 
   /// <inheritdoc />
-  public async Task<TaskState> GetTasksDetailedAsync(string            taskId,
+  public async Task<TaskState> GetTasksDetailedAsync(TaskInfos         taskInfos,
                                                      CancellationToken cancellationToken = default)
   {
     await using var channel = await channelPool_.GetAsync(cancellationToken)
@@ -113,7 +113,7 @@ public class TasksService : ITasksService
 
     var tasks = await tasksClient.GetTaskAsync(new GetTaskRequest
                                                {
-                                                 TaskId = taskId,
+                                                 TaskId = taskInfos.TaskId,
                                                },
                                                cancellationToken: cancellationToken)
                                  .ConfigureAwait(false);

@@ -60,10 +60,10 @@ public interface ITasksService
   /// <summary>
   ///   Asynchronously retrieves detailed information about a specific task.
   /// </summary>
-  /// <param name="taskId">The identifier of the task to retrieve details for.</param>
+  /// <param name="taskInfos">The task's TaskInfos to retrieve details for.</param>
   /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
   /// <returns>A task representing the asynchronous operation. The task result contains the detailed task state.</returns>
-  Task<TaskState> GetTasksDetailedAsync(string            taskId,
+  Task<TaskState> GetTasksDetailedAsync(TaskInfos         taskInfos,
                                         CancellationToken cancellationToken = default);
 
   /// <summary>

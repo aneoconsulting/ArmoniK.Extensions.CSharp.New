@@ -519,7 +519,11 @@ public class TasksServiceTests
 
     client.CallInvokerMock.SetupAsyncUnaryCallInvokerMock<GetTaskRequest, GetTaskResponse>(taskResponse);
 
-    var result = await client.TasksService.GetTasksDetailedAsync("taskId1")
+    var taskInfo = new TaskInfos
+                   {
+                     TaskId = "taskId1",
+                   };
+    var result = await client.TasksService.GetTasksDetailedAsync(taskInfo)
                              .ConfigureAwait(false);
     Assert.Multiple(() =>
                     {
@@ -793,7 +797,11 @@ public class TasksServiceTests
           .Throws(new RpcException(new Status(StatusCode.NotFound,
                                               "Task not found")));
 
-    Assert.That(async () => await client.TasksService.GetTasksDetailedAsync("nonExistentTaskId"),
+    var nonExistentTaskInfo = new TaskInfos
+                              {
+                                TaskId = "nonExistentTaskId",
+                              };
+    Assert.That(async () => await client.TasksService.GetTasksDetailedAsync(nonExistentTaskInfo),
                 Throws.Exception.TypeOf<RpcException>());
   }
 
