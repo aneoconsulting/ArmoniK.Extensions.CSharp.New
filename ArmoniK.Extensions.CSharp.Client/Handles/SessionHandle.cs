@@ -82,7 +82,7 @@ public class SessionHandle : IAsyncDisposable, IDisposable
   {
     if (!TestAndSetDisposed())
     {
-      await AbortSubmissionsAsync()
+      await CancelCallbacksAsync()
         .ConfigureAwait(false);
       if (closeOnDispose_)
       {
@@ -223,13 +223,10 @@ public class SessionHandle : IAsyncDisposable, IDisposable
                           .ConfigureAwait(false);
 
   /// <summary>
-  ///   Asynchronously waits for pending task submissions and callbacks.
+  ///   Asynchronously waits for pending task submissions and callbacks to be completed.
   /// </summary>
-  /// <returns>
-  ///   A task representing the asynchronous operation.
-  ///   otherwise.
-  /// </returns>
-  public async Task WaitSubmissionAsync()
+  /// <returns> A task representing the asynchronous operation. </returns>
+  public async Task WaitCallbacksAsync()
   {
     var backgroundSubmitter = TestAndSetBackgroundSubmitter();
     if (backgroundSubmitter != null)
@@ -240,10 +237,10 @@ public class SessionHandle : IAsyncDisposable, IDisposable
   }
 
   /// <summary>
-  ///   Aborts the pending task submissions a callbacks.
+  ///   Cancels all pending task submissions and callbacks.
   /// </summary>
   /// <returns>A task representing the asynchronous operation.</returns>
-  public async Task AbortSubmissionsAsync()
+  public async Task CancelCallbacksAsync()
   {
     var backgroundSubmitter = TestAndSetBackgroundSubmitter();
     if (backgroundSubmitter != null)

@@ -53,7 +53,7 @@ internal class CheckBlobCreationResponseOrderClient : ClientBase
 
     SessionHandle!.Submit(taskDefinition);
 
-    await SessionHandle.WaitSubmissionAsync()
+    await SessionHandle.WaitCallbacksAsync()
                        .ConfigureAwait(false);
 
     foreach (var blob in taskDefinition.Outputs.Values)

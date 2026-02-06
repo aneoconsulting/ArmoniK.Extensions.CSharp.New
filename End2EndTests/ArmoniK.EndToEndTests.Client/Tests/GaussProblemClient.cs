@@ -57,7 +57,7 @@ public class GaussProblemClient : ClientBase
 
     SessionHandle!.Submit(task);
 
-    await SessionHandle.WaitSubmissionAsync()
+    await SessionHandle.WaitCallbacksAsync()
                        .ConfigureAwait(false);
 
     var resultString = Encoding.UTF8.GetString(callback.Result);

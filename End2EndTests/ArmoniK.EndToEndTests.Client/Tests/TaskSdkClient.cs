@@ -48,7 +48,7 @@ public class TaskSdkClient : ClientBase
                                              .WithTaskOptions(TaskConfiguration!);
     SessionHandle!.Submit([taskDefinition]);
 
-    await SessionHandle.WaitSubmissionAsync()
+    await SessionHandle.WaitCallbacksAsync()
                        .ConfigureAwait(false);
 
     var resultString = "";
@@ -91,7 +91,7 @@ public class TaskSdkClient : ClientBase
     }
 
     SessionHandle!.Submit(taskDefinitions);
-    await SessionHandle.WaitSubmissionAsync()
+    await SessionHandle.WaitCallbacksAsync()
                        .ConfigureAwait(false);
 
     foreach (var task in taskDefinitions)

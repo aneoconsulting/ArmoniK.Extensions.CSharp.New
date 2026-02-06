@@ -33,9 +33,15 @@ public class TaskHandle
   public readonly ArmoniKClient ArmoniKClient;
 
   /// <summary>
+  ///   Promise of the TaskInfos when the task as been submitted.
+  ///   It needs to be volatile as we need it to play the role of a barrier in GetTaskInfosAsync().
+  /// </summary>
+  private volatile TaskCompletionSource<TaskInfos>? taskInfosSource_;
+
+  /// <summary>
   ///   Gets the task information for which this handle will perform operations.
   /// </summary>
-  private readonly TaskInfos? taskInfos_;
+  private TaskInfos? taskInfos_;
 
   /// <summary>
   ///   Initializes a new instance of the <see cref="TaskHandle" /> class with a specified ArmoniK client and task
@@ -49,15 +55,16 @@ public class TaskHandle
                      TaskInfos?                       taskInfo,
                      TaskCompletionSource<TaskInfos>? source)
   {
-    ArmoniKClient   = armoniKClient;
-    taskInfos_      = taskInfo;
-    TaskInfosSource = source;
+    ArmoniKClient    = armoniKClient;
+    taskInfos_       = taskInfo;
+    taskInfosSource_ = source;
   }
 
   /// <summary>
   ///   The TaskCompletionSource valued by the task submission.
   /// </summary>
-  internal TaskCompletionSource<TaskInfos>? TaskInfosSource { get; set; }
+  internal TaskCompletionSource<TaskInfos>? TaskInfosSource
+    => taskInfosSource_;
 
   /// <summary>
   ///   Creates a TaskHandle from a TaskInfos and ArmoniKClient.
@@ -89,14 +96,29 @@ public class TaskHandle
   ///   Get the TaskInfo instance.
   /// </summary>
   /// <returns>A task representing the asynchronous operation. The task result contains the TaskInfo instance</returns>
-  public async Task<TaskInfos> GetTaskInfosAsync()
+  public ValueTask<TaskInfos> GetTaskInfosAsync()
   {
-    if (TaskInfosSource != null)
+    var taskInfos = taskInfos_;
+    if (taskInfos is not null)
     {
-      return await TaskInfosSource.Task.ConfigureAwait(false);
+      return new ValueTask<TaskInfos>(taskInfos);
     }
 
-    return taskInfos_!;
+    return Core();
+
+    async ValueTask<TaskInfos> Core()
+    {
+      var tcs = taskInfosSource_;
+      if (tcs is null)
+      {
+        return taskInfos_!;
+      }
+
+      var taskInfos = await tcs.Task.ConfigureAwait(false);
+      taskInfos_       = taskInfos;
+      taskInfosSource_ = null;
+      return taskInfos;
+    }
   }
 
   /// <summary>

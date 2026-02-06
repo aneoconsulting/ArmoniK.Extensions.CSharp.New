@@ -19,7 +19,6 @@ using System.Text;
 using ArmoniK.Extensions.CSharp.Client.Common.Domain.Blob;
 using ArmoniK.Extensions.CSharp.Client.Common.Domain.Task;
 using ArmoniK.Extensions.CSharp.Client.Handles;
-using ArmoniK.Utils;
 
 namespace ArmoniK.EndToEndTests.Client.Tests;
 
@@ -71,10 +70,9 @@ public class PriorityClient : ClientBase
       }
 
       allTasks.AddRange(taskDefinitions);
-      await SessionHandle!.Submit(taskDefinitions)
-                          .Select(taskHandle => taskHandle.GetTaskInfosAsync())
-                          .WhenAll()
-                          .ConfigureAwait(false);
+      SessionHandle!.Submit(taskDefinitions);
+      await SessionHandle.WaitCallbacksAsync()
+                         .ConfigureAwait(false);
 
       taskDefinitions.Clear();
     }

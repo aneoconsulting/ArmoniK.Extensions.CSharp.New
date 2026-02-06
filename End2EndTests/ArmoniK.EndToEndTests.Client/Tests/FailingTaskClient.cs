@@ -46,7 +46,7 @@ internal class FailingTaskClient : ClientBase
                                              .WithTaskOptions(TaskConfiguration!);
     SessionHandle!.Submit([taskDefinition]);
 
-    await SessionHandle.WaitSubmissionAsync()
+    await SessionHandle.WaitCallbacksAsync()
                        .ConfigureAwait(false);
 
     Assert.That(callback.Aborted,
@@ -75,7 +75,7 @@ internal class FailingTaskClient : ClientBase
                                         CancellationToken cancellationToken)
     {
       Aborted = true;
-      await sessionHandle_.AbortSubmissionsAsync()
+      await sessionHandle_.CancelCallbacksAsync()
                           .ConfigureAwait(false);
     }
   }
