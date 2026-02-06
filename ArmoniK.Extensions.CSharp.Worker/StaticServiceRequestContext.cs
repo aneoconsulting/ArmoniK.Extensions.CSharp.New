@@ -32,7 +32,7 @@ public class StaticServiceRequestContext<TW> : IServiceRequestContext
 {
   private readonly object                                   locker_ = new();
   private readonly ILogger<StaticServiceRequestContext<TW>> logger_;
-  private          TW?                                      worker_;
+  private volatile TW?                                      worker_;
 
   /// <summary>
   ///   Initializes a new instance of the <see cref="StaticServiceRequestContext{TW}" /> class.
