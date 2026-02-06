@@ -50,7 +50,8 @@ public class StaticServiceRequestContext<TW> : IServiceRequestContext
   /// <returns>A task representing the asynchronous operation, containing the heath status of the worker.</returns>
   public async Task<HealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken)
   {
-    var worker = GetWorker();
+    // We must work on a copy of worker_ because it can be reinitialized to null by ExecuteTaskAsync()
+    var worker = worker_;
     if (worker == null)
     {
       return HealthCheckResult.Healthy("Library static worker infrastructure is operational (no service loaded yet)");
@@ -71,8 +72,7 @@ public class StaticServiceRequestContext<TW> : IServiceRequestContext
   {
     try
     {
-      SetWorker(new TW());
-
+      worker_ = new TW();
       var output = await SdkTaskRunner.Run(taskHandler,
                                            worker_!,
                                            logger_,
@@ -82,23 +82,7 @@ public class StaticServiceRequestContext<TW> : IServiceRequestContext
     }
     finally
     {
-      SetWorker(null);
-    }
-  }
-
-  private void SetWorker(TW? worker)
-  {
-    lock (locker_)
-    {
-      worker_ = worker;
-    }
-  }
-
-  private TW? GetWorker()
-  {
-    lock (locker_)
-    {
-      return worker_;
+      worker_ = null;
     }
   }
 }
