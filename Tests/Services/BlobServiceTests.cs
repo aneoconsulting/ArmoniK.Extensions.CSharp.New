@@ -564,12 +564,8 @@ public class BlobServiceTests
                    };
 
     // Collect the chunks of data returned by the DownloadBlobWithChunksAsync method
-    var resultChunks = new List<byte[]>();
-    await foreach (var chunk in client.BlobService.DownloadBlobWithChunksAsync(blobInfo))
-    {
-      resultChunks.Add(chunk);
-    }
-
+    var resultChunks = await client.BlobService.DownloadBlobByChunksAsync(blobInfo)
+                                   .ConfigureAwait(false);
 
     // Verify that the chunks received match the expected chunks
     Assert.That(expectedChunks,
