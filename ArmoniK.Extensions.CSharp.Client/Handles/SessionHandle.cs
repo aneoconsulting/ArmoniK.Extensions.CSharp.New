@@ -52,7 +52,8 @@ public class SessionHandle : IAsyncDisposable, IDisposable
   public readonly SessionInfo SessionInfo;
 
   private readonly bool                 closeOnDispose_;
-  private volatile BackgroundSubmitter? backgroundSubmitter_;
+  private readonly object               locker_ = new();
+  private          BackgroundSubmitter? backgroundSubmitter_;
 
   private int isDisposed_;
 
@@ -107,15 +108,23 @@ public class SessionHandle : IAsyncDisposable, IDisposable
 
   private BackgroundSubmitter? TestAndSetBackgroundSubmitter()
   {
-    var ret = backgroundSubmitter_;
-    backgroundSubmitter_ = null;
-    return ret;
+    lock (locker_)
+    {
+      var ret = backgroundSubmitter_;
+      backgroundSubmitter_ = null;
+      return ret;
+    }
   }
 
   private BackgroundSubmitter CreateBackgroundSubmitterIfNeeded(CancellationToken cancellationToken)
-    => backgroundSubmitter_ ??= new BackgroundSubmitter(ArmoniKClient,
-                                                        SessionInfo,
-                                                        cancellationToken);
+  {
+    lock (locker_)
+    {
+      return backgroundSubmitter_ ??= new BackgroundSubmitter(ArmoniKClient,
+                                                              SessionInfo,
+                                                              cancellationToken);
+    }
+  }
 
   private bool TestAndSetDisposed()
     => Interlocked.Exchange(ref isDisposed_,
@@ -419,13 +428,15 @@ public class SessionHandle : IAsyncDisposable, IDisposable
 
     private readonly ArmoniKClient client_;
 
+    private readonly object locker_ = new();
+
     /// <summary>
     ///   Exits the execution loop when cancellation is requested.
     /// </summary>
     private readonly CancellationTokenSource loopCts_;
 
     private readonly Task                        workerTask_;
-    private volatile TaskCompletionSource<bool>? taskCompletionSource_;
+    private          TaskCompletionSource<bool>? taskCompletionSource_;
 
     public CallbackRunner(ArmoniKClient     client,
                           CancellationToken cancellationToken)
@@ -456,6 +467,30 @@ public class SessionHandle : IAsyncDisposable, IDisposable
     public void AbortCallbacks()
       => callbacksCts_.Cancel();
 
+    private TaskCompletionSource<bool>? CreateTaskCompletionSource()
+    {
+      lock (locker_)
+      {
+        return taskCompletionSource_ ??= new TaskCompletionSource<bool>();
+      }
+    }
+
+    private void ResetTaskCompletionSource()
+    {
+      lock (locker_)
+      {
+        taskCompletionSource_ = null;
+      }
+    }
+
+    private TaskCompletionSource<bool>? GetTaskCompletionSource()
+    {
+      lock (locker_)
+      {
+        return taskCompletionSource_;
+      }
+    }
+
     /// <summary>
     ///   Wait until all registered callbacks are executed.
     /// </summary>
@@ -465,10 +500,8 @@ public class SessionHandle : IAsyncDisposable, IDisposable
     /// </returns>
     public async Task<bool> WaitAsync()
     {
-      taskCompletionSource_ ??= new TaskCompletionSource<bool>();
-      var result = await taskCompletionSource_.Task.ConfigureAwait(false);
-      taskCompletionSource_ = null;
-      return result;
+      var taskCompletionSource = CreateTaskCompletionSource();
+      return await taskCompletionSource!.Task.ConfigureAwait(false);
     }
 
     /// <summary>
@@ -548,6 +581,8 @@ public class SessionHandle : IAsyncDisposable, IDisposable
     /// </summary>
     private async Task RunAsync()
     {
+      TaskCompletionSource<bool>? taskCompletionSource = null;
+
       var channel = Channel.CreateUnbounded<(ICallback callback, BlobState blobState)>(new UnboundedChannelOptions
                                                                                        {
                                                                                          SingleReader = true,
@@ -584,11 +619,11 @@ public class SessionHandle : IAsyncDisposable, IDisposable
             }
           }
 
-          // Get a copy of the volatile task completion source and work with the copy
-          var taskCompletionSource = taskCompletionSource_;
+          taskCompletionSource = GetTaskCompletionSource();
           if (taskCompletionSource != null && callbacks_.IsEmpty)
           {
             taskCompletionSource.SetResult(true);
+            ResetTaskCompletionSource();
           }
 
           // Wait for 5 second and then retry
@@ -597,11 +632,13 @@ public class SessionHandle : IAsyncDisposable, IDisposable
                     .ConfigureAwait(false);
         }
 
-        taskCompletionSource_?.SetResult(false);
+        taskCompletionSource = GetTaskCompletionSource();
+        taskCompletionSource?.SetResult(false);
       }
       catch (OperationCanceledException)
       {
-        taskCompletionSource_?.SetResult(false);
+        taskCompletionSource = GetTaskCompletionSource();
+        taskCompletionSource?.SetResult(false);
       }
       finally
       {
