@@ -115,7 +115,7 @@ public class TaskHandle
       }
 
       var taskInfos = await tcs.Task.ConfigureAwait(false);
-      taskInfos_       = taskInfos;
+      taskInfos_ = taskInfos;
       // taskInfosSource_ needs here to be volatile because volatile write has release semantics (allows other threads to see the effects of preceding operations).
       // This prevent the compiler to do some operation reordering, then we are sure taskInfos_ has actually been assigned when we reach that point
       // therefore if a thread can see a null taskInfosSource_, it is guaranteed to see a non-null taskInfos_.

@@ -151,12 +151,12 @@ public class BlobService : IBlobService
     await using var channel = await channelPool_.GetAsync(cancellationToken)
                                                 .ConfigureAwait(false);
     var blobClient = new Results.ResultsClient(channel);
-    var stream = blobClient.DownloadResultData(new DownloadResultDataRequest
-                                               {
-                                                 ResultId  = blobInfo.BlobId,
-                                                 SessionId = blobInfo.SessionId,
-                                               },
-                                               cancellationToken: cancellationToken);
+    using var stream = blobClient.DownloadResultData(new DownloadResultDataRequest
+                                                     {
+                                                       ResultId  = blobInfo.BlobId,
+                                                       SessionId = blobInfo.SessionId,
+                                                     },
+                                                     cancellationToken: cancellationToken);
     while (await stream.ResponseStream.MoveNext(cancellationToken)
                        .ConfigureAwait(false))
     {
@@ -431,7 +431,7 @@ public class BlobService : IBlobService
                                                 .ConfigureAwait(false);
     var blobClient = new Results.ResultsClient(channel);
 
-    var stream = blobClient.UploadResultData(cancellationToken: cancellationToken);
+    using var stream = blobClient.UploadResultData(cancellationToken: cancellationToken);
     await stream.RequestStream.WriteAsync(new UploadResultDataRequest
                                           {
                                             Id = new UploadResultDataRequest.Types.ResultIdentifier
