@@ -14,11 +14,44 @@ jobs:
         ref: ${{ github.ref }}
         submodules: true
 
+    - name: Generate version from git describe
+      id: version
+      run: |
+        # Fetch git describe
+        GIT_DESCRIBE=$(git describe --tags --long --always --dirty)
+        echo "git-describe=$GIT_DESCRIBE" >> $GITHUB_OUTPUT
+        
+        # Set the prerelease version
+        VERSION=$(echo $GIT_DESCRIBE | sed -E 's/^v?([0-9]+\.[0-9]+\.[0-9]+)-([0-9]+)-g([0-9a-f]+)(-dirty)?$/\1-pre.\2+\3\4/')
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        
+        VERSION_NO_V=$(echo $VERSION | sed 's/^v//')
+        echo "version-no-v=$VERSION_NO_V" >> $GITHUB_OUTPUT
+        
+        echo "### Version Info" >> $GITHUB_STEP_SUMMARY
+        echo "- Git Describe: \`$GIT_DESCRIBE\`" >> $GITHUB_STEP_SUMMARY
+        echo "- Version: \`$VERSION\`" >> $GITHUB_STEP_SUMMARY
+
     - name: Restore dependencies
       run: dotnet restore
 
     - name: Build the solution
-      run: dotnet build ArmoniK.Extensions.CSharp.sln -c Release -warnAsError:"CS1570;CS1571;CS1572;CS1573;CS1587;CS1591"
+      run: dotnet build ArmoniK.Extensions.CSharp.sln -c Release --no-restore \
+          -p:Version=${{ steps.version.outputs.version-no-v }} \
+          -p:AssemblyVersion=${{ steps.version.outputs.version-no-v }} \
+          -p:FileVersion=${{ steps.version.outputs.version-no-v }}
+          -warnAsError:"CS1570;CS1571;CS1572;CS1573;CS1587;CS1591"
+              
+    - name: Pack the package VERSION
+      run: |
+        dotnet pack ArmoniK.Extensions.Csharp.sln -c Release --no-build -o /tmp/packages 
+          -p:Version=${{ steps.version.outputs.version-no-v }} \
+          -p:PackageVersion=${{ steps.version.outputs.version-no-v }} \
+          --output ./artifacts
+
+    - name: Push the package
+      run: |
+        find /tmp/packages -name 'ArmoniK*.nupkg' ! -name '*test*.nupkg' -exec dotnet nuget push {} -k ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate --no-symbols \;
 
   runTests:
     needs: buildProject
