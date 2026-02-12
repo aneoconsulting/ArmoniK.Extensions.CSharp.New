@@ -43,17 +43,6 @@ jobs:
           -p:FileVersion=${{ steps.version.outputs.version-no-v }} \
           -warnAsError:"CS1570;CS1571;CS1572;CS1573;CS1587;CS1591"
               
-    - name: Pack the package VERSION
-      run: |
-        dotnet pack ArmoniK.Extensions.Csharp.sln -c Release --no-build -o /tmp/packages 
-          -p:Version=${{ steps.version.outputs.version-no-v }} \
-          -p:PackageVersion=${{ steps.version.outputs.version-no-v }} \
-          --output ./artifacts
-
-    - name: Push the package
-      run: |
-        find /tmp/packages -name 'ArmoniK*.nupkg' ! -name '*test*.nupkg' -exec dotnet nuget push {} -k ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate --no-symbols \;
-
   runTests:
     needs: buildProject
     runs-on: ubuntu-latest
@@ -75,3 +64,20 @@ jobs:
 
     - name: Run Tests
       run: dotnet test Tests/Tests.csproj -c Release --verbosity normal
+
+  publish:
+    needs: runTests
+    runs-on: ubuntu-latest
+    steps:
+    - name: Pack the package VERSION
+      run: |
+        dotnet pack ArmoniK.Extensions.Csharp.sln -c Release --no-build -o /tmp/packages 
+          -p:Version=${{ steps.version.outputs.version-no-v }} \
+          -p:PackageVersion=${{ steps.version.outputs.version-no-v }} \
+          --output ./artifacts
+
+    - name: Push the package
+      run: |
+        find /tmp/packages -name 'ArmoniK*.nupkg' ! -name '*test*.nupkg' -exec dotnet nuget push {} -k ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate --no-symbols \;
+
+    
