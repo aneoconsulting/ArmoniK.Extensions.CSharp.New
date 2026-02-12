@@ -108,6 +108,9 @@ public class TaskHandle
 
     async ValueTask<TaskInfos> Core()
     {
+      // volatile read of taskInfosSource_ here has acuire semantics and with the combination
+      // of the volatile write of taskInfosSource_ below, it ensures that if we see a null value for taskInfosSource_,
+      // we are sure to see a non-null value for taskInfos_.
       var tcs = taskInfosSource_;
       if (tcs is null)
       {
@@ -116,7 +119,7 @@ public class TaskHandle
 
       var taskInfos = await tcs.Task.ConfigureAwait(false);
       taskInfos_ = taskInfos;
-      // taskInfosSource_ needs here to be volatile because volatile write has release semantics (allows other threads to see the effects of preceding operations).
+      // volatile write of taskInfosSource_ here has release semantics (allows other threads to see the effects of preceding operations).
       // This prevent the compiler to do some operation reordering, then we are sure taskInfos_ has actually been assigned when we reach that point
       // therefore if a thread can see a null taskInfosSource_, it is guaranteed to see a non-null taskInfos_.
       taskInfosSource_ = null;
