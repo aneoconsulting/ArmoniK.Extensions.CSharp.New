@@ -42,8 +42,8 @@ on:
           linux/amd64
         push: true
         tags: |
-            dockerhubaneo/armonik_csharp_worker_dll:${{ github.ref_name }}
-            dockerhubaneo/armonik_csharp_worker_dll:latest
+            dockerhubaneo/armonik-dynamic-dotnet-worker:${{ github.ref_name }}
+            dockerhubaneo/armonik-dynamic-dotnet-worker:latest
 
   buildProjects:
     runs-on: ubuntu-latest
