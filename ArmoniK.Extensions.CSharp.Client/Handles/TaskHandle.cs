@@ -108,9 +108,9 @@ public class TaskHandle
 
     async ValueTask<TaskInfos> Core()
     {
-      // volatile read of taskInfosSource_ here has acuire semantics and with the combination
+      // volatile read of taskInfosSource_ here has acquire semantics and with the combination
       // of the volatile write of taskInfosSource_ below, it ensures that if we see a null value for taskInfosSource_,
-      // we are sure to see a non-null value for taskInfos_.
+      // we are guaranteed to see a non-null value for taskInfos_.
       var tcs = taskInfosSource_;
       if (tcs is null)
       {
