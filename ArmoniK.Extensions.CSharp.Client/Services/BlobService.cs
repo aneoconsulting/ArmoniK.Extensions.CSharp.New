@@ -145,39 +145,67 @@ public class BlobService : IBlobService
   }
 
   /// <inheritdoc />
-  public async IAsyncEnumerable<byte[]> DownloadBlobWithChunksAsync(BlobInfo                                   blobInfo,
-                                                                    [EnumeratorCancellation] CancellationToken cancellationToken = default)
+  public async Task<ICollection<byte[]>> DownloadBlobByChunksAsync(BlobInfo          blobInfo,
+                                                                   CancellationToken cancellationToken = default)
   {
-    await using var channel = await channelPool_.GetAsync(cancellationToken)
-                                                .ConfigureAwait(false);
-    var blobClient = new Results.ResultsClient(channel);
-    var stream = blobClient.DownloadResultData(new DownloadResultDataRequest
-                                               {
-                                                 ResultId  = blobInfo.BlobId,
-                                                 SessionId = blobInfo.SessionId,
-                                               },
-                                               cancellationToken: cancellationToken);
-    while (await stream.ResponseStream.MoveNext(cancellationToken)
-                       .ConfigureAwait(false))
+    Exception? lastException = null;
+    var        result        = new List<byte[]>();
+    for (var loopCount = 0; loopCount < armoniKClient_.Properties.RetryRequestCount; loopCount++)
     {
-      yield return stream.ResponseStream.Current.DataChunk.ToByteArray();
+      try
+      {
+        await using var channel = await channelPool_.GetAsync(cancellationToken)
+                                                    .ConfigureAwait(false);
+        var blobClient = new Results.ResultsClient(channel);
+        using var stream = blobClient.DownloadResultData(new DownloadResultDataRequest
+                                                         {
+                                                           ResultId  = blobInfo.BlobId,
+                                                           SessionId = blobInfo.SessionId,
+                                                         },
+                                                         cancellationToken: cancellationToken);
+
+        while (await stream.ResponseStream.MoveNext(cancellationToken)
+                           .ConfigureAwait(false))
+        {
+          var chunk = stream.ResponseStream.Current.DataChunk.ToByteArray();
+          result.Add(chunk);
+        }
+
+        // We suceeded, we must reset the last exception if any
+        lastException = null;
+        break;
+      }
+      catch (Exception e)
+      {
+        lastException = e;
+        result.Clear();
+      }
     }
+
+    if (lastException != null)
+    {
+      logger_.LogError("Unexpected error while downloading blob {BlobId}: {Ex}",
+                       blobInfo.BlobId,
+                       lastException);
+      throw lastException;
+    }
+
+    return result;
   }
 
   /// <inheritdoc />
-  public async Task UploadBlobAsync(BlobInfo             blobInfo,
-                                    ReadOnlyMemory<byte> blobContent,
-                                    CancellationToken    cancellationToken = default)
+  public async Task<BlobState> UploadBlobAsync(BlobInfo             blobInfo,
+                                               ReadOnlyMemory<byte> blobContent,
+                                               CancellationToken    cancellationToken = default)
   {
-    await using var channel = await channelPool_.GetAsync(cancellationToken)
-                                                .ConfigureAwait(false);
-    var blobClient = new Results.ResultsClient(channel);
-
-    await UploadBlobAsync(blobInfo,
-                          blobContent,
-                          blobClient,
-                          cancellationToken)
-      .ConfigureAwait(false);
+    var content = new[]
+                  {
+                    blobContent,
+                  };
+    return await UploadBlobAsync(blobInfo,
+                                 content.ToAsyncEnumerable(),
+                                 cancellationToken)
+             .ConfigureAwait(false);
   }
 
   /// <inheritdoc />
@@ -208,10 +236,6 @@ public class BlobService : IBlobService
         .ConfigureAwait(false);
     }
 
-    await using var channel = await channelPool_.GetAsync(cancellationToken)
-                                                .ConfigureAwait(false);
-    var blobClient = new Results.ResultsClient(channel);
-
     if (serviceConfiguration_ != null && content.Length > serviceConfiguration_.DataChunkMaxSize)
     {
       var blobInfo = CreateBlobsMetadataAsync(session,
@@ -221,11 +245,14 @@ public class BlobService : IBlobService
                                        .ConfigureAwait(false);
       await UploadBlobAsync(createdBlobs.First(),
                             content,
-                            blobClient,
                             cancellationToken)
         .ConfigureAwait(false);
       return createdBlobs.First();
     }
+
+    await using var channel = await channelPool_.GetAsync(cancellationToken)
+                                                .ConfigureAwait(false);
+    var blobClient = new Results.ResultsClient(channel);
 
     var blobCreationResponse = await blobClient.CreateResultsAsync(new CreateResultsRequest
                                                                    {
@@ -407,6 +434,73 @@ public class BlobService : IBlobService
     }
   }
 
+  /// <inheritdoc />
+  public async Task<BlobState> UploadBlobAsync(BlobInfo                               blob,
+                                               IAsyncEnumerable<ReadOnlyMemory<byte>> blobContent,
+                                               CancellationToken                      cancellationToken)
+  {
+    if (serviceConfiguration_ is null)
+    {
+      await LoadBlobServiceConfigurationAsync(cancellationToken)
+        .ConfigureAwait(false);
+    }
+
+    Exception?                lastException = null;
+    UploadResultDataResponse? response      = null;
+    for (var loopCount = 0; loopCount < armoniKClient_.Properties.RetryRequestCount; loopCount++)
+    {
+      try
+      {
+        await using var channel = await channelPool_.GetAsync(cancellationToken)
+                                                    .ConfigureAwait(false);
+        var blobClient = new Results.ResultsClient(channel);
+
+        using var stream = blobClient.UploadResultData();
+        await stream.RequestStream.WriteAsync(new UploadResultDataRequest
+                                              {
+                                                Id = new UploadResultDataRequest.Types.ResultIdentifier
+                                                     {
+                                                       ResultId  = blob.BlobId,
+                                                       SessionId = blob.SessionId,
+                                                     },
+                                              })
+                    .ConfigureAwait(false);
+        await foreach (var segment in Resize(blobContent,
+                                             serviceConfiguration_!.DataChunkMaxSize)
+                         .ConfigureAwait(false))
+        {
+          await stream.RequestStream.WriteAsync(new UploadResultDataRequest
+                                                {
+                                                  DataChunk = UnsafeByteOperations.UnsafeWrap(segment),
+                                                })
+                      .ConfigureAwait(false);
+        }
+
+        await stream.RequestStream.CompleteAsync()
+                    .ConfigureAwait(false);
+        response = await stream.ResponseAsync.ConfigureAwait(false);
+
+        // We suceeded, we must reset the last exception if any
+        lastException = null;
+        break;
+      }
+      catch (Exception e)
+      {
+        lastException = e;
+      }
+    }
+
+    if (lastException != null)
+    {
+      logger_.LogError("Unexpected error while uploading blob {BlobId}: {Ex}",
+                       blob.BlobId,
+                       lastException);
+      throw lastException;
+    }
+
+    return response!.Result.ToBlobState();
+  }
+
   private async Task LoadBlobServiceConfigurationAsync(CancellationToken cancellationToken = default)
   {
     await using var channel = await channelPool_.GetAsync(cancellationToken)
@@ -431,7 +525,7 @@ public class BlobService : IBlobService
                                                 .ConfigureAwait(false);
     var blobClient = new Results.ResultsClient(channel);
 
-    var stream = blobClient.UploadResultData(cancellationToken: cancellationToken);
+    using var stream = blobClient.UploadResultData(cancellationToken: cancellationToken);
     await stream.RequestStream.WriteAsync(new UploadResultDataRequest
                                           {
                                             Id = new UploadResultDataRequest.Types.ResultIdentifier
@@ -465,23 +559,65 @@ public class BlobService : IBlobService
     return await stream.ResponseAsync.ConfigureAwait(false);
   }
 
-
-  private async Task UploadBlobAsync(BlobInfo              blob,
-                                     ReadOnlyMemory<byte>  blobContent,
-                                     Results.ResultsClient blobClient,
-                                     CancellationToken     cancellationToken)
+  /// <summary>
+  ///   Resize elemnts of an asynchronous enumeration to produce elements of size maxsize as much as possible.
+  /// </summary>
+  /// <param name="source">The input enumerable</param>
+  /// <param name="maxSize">The max size of the of the output's chunks</param>
+  /// <returns>The enumerable of resized elements</returns>
+  internal static async IAsyncEnumerable<ReadOnlyMemory<byte>> Resize(IAsyncEnumerable<ReadOnlyMemory<byte>> source,
+                                                                      int                                    maxSize)
   {
-    try
+    ReadOnlyMemory<byte>? previousSegment = null;
+    // We iterate over the enumeration's elements (called segments here) which are split in chunks when necessary
+    await foreach (var segment in source.ConfigureAwait(false))
     {
-      await blobClient.UploadResultData(blob.SessionId,
-                                        blob.BlobId,
-                                        blobContent.ToArray())
-                      .ConfigureAwait(false);
+      var currentSegment = segment;
+      if (previousSegment != null)
+      {
+        // Let's concatenate the previous segment with the current one.
+        var concat = new byte[previousSegment.Value.Length + currentSegment.Length];
+        previousSegment.Value.Span.CopyTo(concat.AsSpan(0,
+                                                        previousSegment.Value.Length));
+        currentSegment.Span.CopyTo(concat.AsSpan(previousSegment.Value.Length,
+                                                 currentSegment.Length));
+        currentSegment  = concat;
+        previousSegment = null;
+      }
+
+      if (currentSegment.Length > maxSize)
+      {
+        // let's split the segment in chunks
+        var offset = 0;
+        while (true)
+        {
+          var chunkSize = Math.Min(maxSize,
+                                   currentSegment.Length - offset);
+          var chunk = currentSegment.Slice(offset,
+                                           chunkSize);
+          if (chunkSize < maxSize)
+          {
+            previousSegment = chunk;
+            break;
+          }
+
+          yield return chunk;
+          offset += maxSize;
+        }
+      }
+      else if (currentSegment.Length == maxSize)
+      {
+        yield return currentSegment;
+      }
+      else
+      {
+        previousSegment = currentSegment;
+      }
     }
-    catch (Exception e)
+
+    if (previousSegment != null)
     {
-      logger_.LogError(e.Message);
-      throw;
+      yield return previousSegment.Value;
     }
   }
 

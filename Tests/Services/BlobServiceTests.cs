@@ -19,6 +19,7 @@ using ArmoniK.Api.gRPC.V1.Results;
 using ArmoniK.Extensions.CSharp.Client.Common.Domain.Blob;
 using ArmoniK.Extensions.CSharp.Client.Common.Domain.Session;
 using ArmoniK.Extensions.CSharp.Client.Common.Enum;
+using ArmoniK.Extensions.CSharp.Client.Services;
 using ArmoniK.Extensions.CSharp.Common.Common.Domain.Blob;
 
 using Google.Protobuf;
@@ -247,6 +248,8 @@ public class BlobServiceTests
                                          Name      = name,
                                          ResultId  = "blobId",
                                          SessionId = "sessionId",
+                                         CreatedAt = DateTime.Now.ToUniversalTime()
+                                                             .ToTimestamp(),
                                        },
                                      },
                                    };
@@ -265,6 +268,8 @@ public class BlobServiceTests
                                      Name      = name,
                                      ResultId  = "blobId",
                                      SessionId = "sessionId",
+                                     CreatedAt = DateTime.Now.ToUniversalTime()
+                                                         .ToTimestamp(),
                                    },
                                  },
                                };
@@ -279,6 +284,8 @@ public class BlobServiceTests
                                   {
                                     Name     = "anyResult",
                                     ResultId = "anyResultId",
+                                    CreatedAt = DateTime.Now.ToUniversalTime()
+                                                        .ToTimestamp(),
                                   },
                        };
 
@@ -385,6 +392,8 @@ public class BlobServiceTests
                                       ResultId  = "testBlobId",
                                       SessionId = "sessionId",
                                       Status    = ResultStatus.Completed,
+                                      CreatedAt = DateTime.Now.ToUniversalTime()
+                                                          .ToTimestamp(),
                                     },
                          };
 
@@ -401,6 +410,82 @@ public class BlobServiceTests
 
     await client.BlobService.UploadBlobAsync(blobInfo,
                                              contents,
+                                             CancellationToken.None);
+
+    Assert.Multiple(() =>
+                    {
+                      client.CallInvokerMock.Verify(x => x.AsyncUnaryCall(It.IsAny<Method<Empty, ResultsServiceConfigurationResponse>>(),
+                                                                          It.IsAny<string>(),
+                                                                          It.IsAny<CallOptions>(),
+                                                                          It.IsAny<Empty>()),
+                                                    Times.Once,
+                                                    "Service configuration should be called");
+
+                      client.CallInvokerMock.Verify(x => x.AsyncClientStreamingCall(It.IsAny<Method<UploadResultDataRequest, UploadResultDataResponse>>(),
+                                                                                    It.IsAny<string>(),
+                                                                                    It.IsAny<CallOptions>()),
+                                                    Times.Once,
+                                                    "Upload streaming should be called");
+                    });
+  }
+
+  [Test]
+  public async Task UploadBlobAsyncWithAsyncContentUploadsBlob()
+  {
+    var client = new MockedArmoniKClient();
+    var contents = new List<ReadOnlyMemory<byte>>
+                   {
+                     new byte[]
+                     {
+                       1,
+                       2,
+                       3,
+                     },
+                     new byte[]
+                     {
+                       4,
+                       5,
+                       6,
+                     },
+                     new byte[]
+                     {
+                       7,
+                       8,
+                       9,
+                     },
+                   };
+
+    var serviceConfig = new ResultsServiceConfigurationResponse
+                        {
+                          DataChunkMaxSize = 2,
+                        };
+    client.CallInvokerMock.SetupAsyncUnaryCallInvokerMock<Empty, ResultsServiceConfigurationResponse>(serviceConfig);
+
+    var uploadResponse = new UploadResultDataResponse
+                         {
+                           Result = new ResultRaw
+                                    {
+                                      ResultId  = "testBlobId",
+                                      SessionId = "sessionId",
+                                      Status    = ResultStatus.Completed,
+                                      CreatedAt = DateTime.Now.ToUniversalTime()
+                                                          .ToTimestamp(),
+                                    },
+                         };
+
+    var mockStream = new Mock<IClientStreamWriter<UploadResultDataRequest>>();
+    client.CallInvokerMock.SetupAsyncClientStreamingCall(uploadResponse,
+                                                         mockStream.Object);
+
+    var blobInfo = new BlobInfo
+                   {
+                     BlobName  = "testBlob",
+                     BlobId    = "testBlobId",
+                     SessionId = "sessionId",
+                   };
+
+    await client.BlobService.UploadBlobAsync(blobInfo,
+                                             contents.ToAsyncEnumerable(),
                                              CancellationToken.None);
 
     Assert.Multiple(() =>
@@ -479,12 +564,8 @@ public class BlobServiceTests
                    };
 
     // Collect the chunks of data returned by the DownloadBlobWithChunksAsync method
-    var resultChunks = new List<byte[]>();
-    await foreach (var chunk in client.BlobService.DownloadBlobWithChunksAsync(blobInfo))
-    {
-      resultChunks.Add(chunk);
-    }
-
+    var resultChunks = await client.BlobService.DownloadBlobByChunksAsync(blobInfo)
+                                   .ConfigureAwait(false);
 
     // Verify that the chunks received match the expected chunks
     Assert.That(expectedChunks,
@@ -728,5 +809,250 @@ public class BlobServiceTests
                              OpaqueId  = opaqueId,
                              CreateAt  = now,
                            }));
+  }
+
+  [Test]
+  public async Task ResizeTest1()
+  {
+    var list = new List<ReadOnlyMemory<byte>>
+               {
+                 new byte[]
+                 {
+                   1,
+                   2,
+                   3,
+                 },
+                 new byte[]
+                 {
+                   4,
+                   5,
+                   6,
+                 },
+                 new byte[]
+                 {
+                   7,
+                   8,
+                   9,
+                 },
+               };
+    var resultAsync = BlobService.Resize(list.ToAsyncEnumerable(),
+                                         2);
+
+    var result = await resultAsync.ToArrayAsync()
+                                  .ConfigureAwait(false);
+
+    Assert.Multiple(() =>
+                    {
+                      Assert.That(result.Length,
+                                  Is.EqualTo(5));
+
+                      Assert.That(result[0]
+                                    .ToArray(),
+                                  Is.EquivalentTo(new byte[]
+                                                  {
+                                                    1,
+                                                    2,
+                                                  }));
+                      Assert.That(result[1]
+                                    .ToArray(),
+                                  Is.EquivalentTo(new byte[]
+                                                  {
+                                                    3,
+                                                    4,
+                                                  }));
+                      Assert.That(result[2]
+                                    .ToArray(),
+                                  Is.EquivalentTo(new byte[]
+                                                  {
+                                                    5,
+                                                    6,
+                                                  }));
+                      Assert.That(result[3]
+                                    .ToArray(),
+                                  Is.EquivalentTo(new byte[]
+                                                  {
+                                                    7,
+                                                    8,
+                                                  }));
+                      Assert.That(result[4]
+                                    .ToArray(),
+                                  Is.EquivalentTo(new byte[]
+                                                  {
+                                                    9,
+                                                  }));
+                    });
+  }
+
+  [Test]
+  public async Task ResizeTest2()
+  {
+    var list = new List<ReadOnlyMemory<byte>>
+               {
+                 new byte[]
+                 {
+                   1,
+                   2,
+                 },
+                 new byte[]
+                 {
+                   3,
+                   4,
+                 },
+                 new byte[]
+                 {
+                   5,
+                   6,
+                 },
+                 new byte[]
+                 {
+                   7,
+                   8,
+                 },
+               };
+    var resultAsync = BlobService.Resize(list.ToAsyncEnumerable(),
+                                         3);
+
+    var result = await resultAsync.ToArrayAsync()
+                                  .ConfigureAwait(false);
+
+    Assert.Multiple(() =>
+                    {
+                      Assert.That(result.Length,
+                                  Is.EqualTo(3));
+
+                      Assert.That(result[0]
+                                    .ToArray(),
+                                  Is.EquivalentTo(new byte[]
+                                                  {
+                                                    1,
+                                                    2,
+                                                    3,
+                                                  }));
+                      Assert.That(result[1]
+                                    .ToArray(),
+                                  Is.EquivalentTo(new byte[]
+                                                  {
+                                                    4,
+                                                    5,
+                                                    6,
+                                                  }));
+                      Assert.That(result[2]
+                                    .ToArray(),
+                                  Is.EquivalentTo(new byte[]
+                                                  {
+                                                    7,
+                                                    8,
+                                                  }));
+                    });
+  }
+
+  [Test]
+  public async Task ResizeTest3()
+  {
+    var list = new List<ReadOnlyMemory<byte>>
+               {
+                 new byte[]
+                 {
+                   1,
+                   2,
+                   3,
+                 },
+                 new byte[]
+                 {
+                   4,
+                   5,
+                   6,
+                 },
+                 new byte[]
+                 {
+                   7,
+                   8,
+                 },
+               };
+    var resultAsync = BlobService.Resize(list.ToAsyncEnumerable(),
+                                         3);
+
+    var result = await resultAsync.ToArrayAsync()
+                                  .ConfigureAwait(false);
+
+    Assert.Multiple(() =>
+                    {
+                      Assert.That(result.Length,
+                                  Is.EqualTo(3));
+
+                      Assert.That(result[0]
+                                    .ToArray(),
+                                  Is.EquivalentTo(new byte[]
+                                                  {
+                                                    1,
+                                                    2,
+                                                    3,
+                                                  }));
+                      Assert.That(result[1]
+                                    .ToArray(),
+                                  Is.EquivalentTo(new byte[]
+                                                  {
+                                                    4,
+                                                    5,
+                                                    6,
+                                                  }));
+                      Assert.That(result[2]
+                                    .ToArray(),
+                                  Is.EquivalentTo(new byte[]
+                                                  {
+                                                    7,
+                                                    8,
+                                                  }));
+                    });
+  }
+
+  [Test]
+  public async Task ResizeTest4()
+  {
+    var list = new List<ReadOnlyMemory<byte>>
+               {
+                 new byte[]
+                 {
+                   1,
+                   2,
+                   3,
+                 },
+                 new byte[]
+                 {
+                   4,
+                   5,
+                   6,
+                 },
+                 new byte[]
+                 {
+                   7,
+                   8,
+                 },
+               };
+    var resultAsync = BlobService.Resize(list.ToAsyncEnumerable(),
+                                         10);
+
+    var result = await resultAsync.ToArrayAsync()
+                                  .ConfigureAwait(false);
+
+    Assert.Multiple(() =>
+                    {
+                      Assert.That(result.Length,
+                                  Is.EqualTo(1));
+
+                      Assert.That(result[0]
+                                    .ToArray(),
+                                  Is.EquivalentTo(new byte[]
+                                                  {
+                                                    1,
+                                                    2,
+                                                    3,
+                                                    4,
+                                                    5,
+                                                    6,
+                                                    7,
+                                                    8,
+                                                  }));
+                    });
   }
 }
