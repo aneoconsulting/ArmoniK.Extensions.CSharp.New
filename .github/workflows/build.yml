@@ -36,7 +36,8 @@ jobs:
       run: dotnet restore
 
     - name: Build the solution
-      run: dotnet build ArmoniK.Extensions.CSharp.sln -c Release --no-restore \
+      run: |
+        dotnet build ArmoniK.Extensions.CSharp.sln -c Release --no-restore \
           -p:Version=${{ steps.version.outputs.version-no-v }} \
           -p:AssemblyVersion=${{ steps.version.outputs.version-no-v }} \
           -p:FileVersion=${{ steps.version.outputs.version-no-v }} \
