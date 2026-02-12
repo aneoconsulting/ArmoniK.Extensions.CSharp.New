@@ -51,9 +51,7 @@ internal class CheckBlobCreationResponseOrderClient : ClientBase
                                               .WithCallback(new Callback()));
     }
 
-    await SessionHandle!.SubmitAsync([taskDefinition])
-                        .SingleAsync()
-                        .ConfigureAwait(false);
+    SessionHandle!.Submit(taskDefinition);
 
     await SessionHandle.WaitCallbacksAsync()
                        .ConfigureAwait(false);

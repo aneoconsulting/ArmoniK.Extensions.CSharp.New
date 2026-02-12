@@ -44,9 +44,7 @@ internal class FailingTaskClient : ClientBase
                                                          BlobDefinition.CreateOutput("blobOutputString")
                                                                        .WithCallback(callback))
                                              .WithTaskOptions(TaskConfiguration!);
-    await SessionHandle!.SubmitAsync([taskDefinition])
-                        .SingleAsync()
-                        .ConfigureAwait(false);
+    SessionHandle!.Submit([taskDefinition]);
 
     await SessionHandle.WaitCallbacksAsync()
                        .ConfigureAwait(false);
@@ -77,7 +75,7 @@ internal class FailingTaskClient : ClientBase
                                         CancellationToken cancellationToken)
     {
       Aborted = true;
-      await sessionHandle_.AbortCallbacksAsync()
+      await sessionHandle_.CancelCallbacksAsync()
                           .ConfigureAwait(false);
     }
   }

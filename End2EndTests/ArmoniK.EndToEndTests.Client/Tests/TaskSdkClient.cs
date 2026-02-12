@@ -46,9 +46,7 @@ public class TaskSdkClient : ClientBase
                                                          BlobDefinition.CreateOutput("blobOutputString")
                                                                        .WithCallback(callback))
                                              .WithTaskOptions(TaskConfiguration!);
-    await SessionHandle!.SubmitAsync([taskDefinition])
-                        .SingleAsync()
-                        .ConfigureAwait(false);
+    SessionHandle!.Submit([taskDefinition]);
 
     await SessionHandle.WaitCallbacksAsync()
                        .ConfigureAwait(false);
@@ -92,9 +90,7 @@ public class TaskSdkClient : ClientBase
                                               .WithTaskOptions(TaskConfiguration!));
     }
 
-    await SessionHandle!.SubmitAsync(taskDefinitions)
-                        .LastOrDefaultAsync()
-                        .ConfigureAwait(false);
+    SessionHandle!.Submit(taskDefinitions);
     await SessionHandle.WaitCallbacksAsync()
                        .ConfigureAwait(false);
 

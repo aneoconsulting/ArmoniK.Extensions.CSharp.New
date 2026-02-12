@@ -51,11 +51,11 @@ public class SessionHandle : IAsyncDisposable, IDisposable
   /// </summary>
   public readonly SessionInfo SessionInfo;
 
-  private readonly bool   closeOnDispose_;
-  private readonly object locker_ = new();
+  private readonly bool                 closeOnDispose_;
+  private readonly object               locker_ = new();
+  private          BackgroundSubmitter? backgroundSubmitter_;
 
-  private CallbackRunner? callbackRunner_;
-  private int             isDisposed_;
+  private int isDisposed_;
 
   /// <summary>
   ///   Initializes a new instance of the <see cref="SessionHandle" /> class.
@@ -67,8 +67,11 @@ public class SessionHandle : IAsyncDisposable, IDisposable
                          ArmoniKClient armoniKClient,
                          bool          closeOnDispose = false)
   {
-    ArmoniKClient   = armoniKClient ?? throw new ArgumentNullException(nameof(armoniKClient));
-    SessionInfo     = session       ?? throw new ArgumentNullException(nameof(session));
+    ArmoniKClient = armoniKClient ?? throw new ArgumentNullException(nameof(armoniKClient));
+    SessionInfo   = session       ?? throw new ArgumentNullException(nameof(session));
+    backgroundSubmitter_ = new BackgroundSubmitter(armoniKClient,
+                                                   session,
+                                                   CancellationToken.None);
     closeOnDispose_ = closeOnDispose;
   }
 
@@ -79,7 +82,7 @@ public class SessionHandle : IAsyncDisposable, IDisposable
   {
     if (!TestAndSetDisposed())
     {
-      await AbortCallbacksAsync()
+      await CancelCallbacksAsync()
         .ConfigureAwait(false);
       if (closeOnDispose_)
       {
@@ -103,28 +106,29 @@ public class SessionHandle : IAsyncDisposable, IDisposable
     => DisposeAsync()
       .WaitSync();
 
-  private bool TestAndSetDisposed()
-    => Interlocked.Exchange(ref isDisposed_,
-                            1) != 0;
-
-  private CallbackRunner? TestAndSetCallbackRunner()
+  private BackgroundSubmitter? TestAndSetBackgroundSubmitter()
   {
     lock (locker_)
     {
-      var ret = callbackRunner_;
-      callbackRunner_ = null;
+      var ret = backgroundSubmitter_;
+      backgroundSubmitter_ = null;
       return ret;
     }
   }
 
-  private CallbackRunner CreateCallbackRunnerIfNeeded(CancellationToken cancellationToken)
+  private BackgroundSubmitter CreateBackgroundSubmitterIfNeeded(CancellationToken cancellationToken)
   {
     lock (locker_)
     {
-      return callbackRunner_ ??= new CallbackRunner(ArmoniKClient,
-                                                    cancellationToken);
+      return backgroundSubmitter_ ??= new BackgroundSubmitter(ArmoniKClient,
+                                                              SessionInfo,
+                                                              cancellationToken);
     }
   }
+
+  private bool TestAndSetDisposed()
+    => Interlocked.Exchange(ref isDisposed_,
+                            1) != 0;
 
   /// <summary>
   ///   Implicit conversion operator from SessionHandle to SessionInfo.
@@ -219,40 +223,50 @@ public class SessionHandle : IAsyncDisposable, IDisposable
                           .ConfigureAwait(false);
 
   /// <summary>
-  ///   Asynchronously waits for the blobs defined with a callback, and calls their respective callbacks.
+  ///   Asynchronously waits for pending task submissions and callbacks to be completed.
   /// </summary>
-  /// <returns>
-  ///   A task representing the asynchronous operation. The task result is true when all callbacks were invoked, false
-  ///   otherwise.
-  /// </returns>
-  public async Task<bool> WaitCallbacksAsync()
+  /// <returns> A task representing the asynchronous operation. </returns>
+  public async Task WaitCallbacksAsync()
   {
-    var callbackRunner = TestAndSetCallbackRunner();
-    if (callbackRunner != null)
+    var backgroundSubmitter = TestAndSetBackgroundSubmitter();
+    if (backgroundSubmitter != null)
     {
-      var result = await callbackRunner.WaitAsync()
-                                       .ConfigureAwait(false);
-      await callbackRunner.DisposeAsync()
-                          .ConfigureAwait(false);
-      return result;
+      await backgroundSubmitter.WaitAsync()
+                               .ConfigureAwait(false);
     }
-
-    return true;
   }
 
   /// <summary>
-  ///   Aborts the execution of callbacks registered during task submission.
+  ///   Cancels all pending task submissions and callbacks.
   /// </summary>
   /// <returns>A task representing the asynchronous operation.</returns>
-  public async Task AbortCallbacksAsync()
+  public async Task CancelCallbacksAsync()
   {
-    var callbackRunner = TestAndSetCallbackRunner();
-    if (callbackRunner != null)
+    var backgroundSubmitter = TestAndSetBackgroundSubmitter();
+    if (backgroundSubmitter != null)
     {
-      callbackRunner.AbortCallbacks();
-      await callbackRunner.DisposeAsync()
-                          .ConfigureAwait(false);
+      await backgroundSubmitter.DisposeAsync()
+                               .ConfigureAwait(false);
     }
+  }
+
+  /// <summary>
+  ///   Submit a task.
+  /// </summary>
+  /// <param name="task">The task to submit</param>
+  /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
+  /// <returns>The TaskHandle instance.</returns>
+  /// <exception cref="ArgumentException">When the task parameter provided is null</exception>
+  public TaskHandle Submit(TaskDefinition    task,
+                           CancellationToken cancellationToken = default)
+  {
+    _ = task ?? throw new ArgumentNullException(nameof(task));
+
+    var backgroundSubmitter = CreateBackgroundSubmitterIfNeeded(cancellationToken);
+    var taskHandle          = TaskHandle.FromTaskCompletionSourceOfTaskInfos(ArmoniKClient);
+    backgroundSubmitter.Add(task,
+                            taskHandle);
+    return taskHandle;
   }
 
   /// <summary>
@@ -260,35 +274,143 @@ public class SessionHandle : IAsyncDisposable, IDisposable
   /// </summary>
   /// <param name="tasks">The tasks to submit</param>
   /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
-  /// <returns>An asynchronous enumeration of TaskHandle instances.</returns>
+  /// <returns>The collection of TaskHandle instances.</returns>
   /// <exception cref="ArgumentException">When the tasks parameter provided is null</exception>
-  public async IAsyncEnumerable<TaskHandle> SubmitAsync(ICollection<TaskDefinition>                tasks,
-                                                        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+  public ICollection<TaskHandle> Submit(ICollection<TaskDefinition> tasks,
+                                        CancellationToken           cancellationToken = default)
   {
-    _ = tasks ?? throw new ArgumentException("Tasks parameter should not be null");
+    _ = tasks ?? throw new ArgumentNullException(nameof(tasks));
 
-    var taskInfos = ArmoniKClient.TasksService.SubmitTasksAsync(SessionInfo,
-                                                                tasks,
-                                                                cancellationToken);
-    var enumTaskDefinition = tasks.GetEnumerator();
-    await foreach (var taskInfo in taskInfos.ConfigureAwait(false))
+    var backgroundSubmitter = CreateBackgroundSubmitterIfNeeded(cancellationToken);
+    var taskHandles         = new TaskHandle[tasks.Count];
+    for (var i = 0; i < tasks.Count; i++)
     {
-      enumTaskDefinition.MoveNext();
-      var taskDefinition = enumTaskDefinition.Current;
+      taskHandles[i] = TaskHandle.FromTaskCompletionSourceOfTaskInfos(ArmoniKClient);
+      backgroundSubmitter.Add(tasks.ElementAt(i),
+                              taskHandles[i]);
+    }
 
-      var blobsWithCallbacks = taskDefinition.Outputs.Values.Where(b => b.CallBack != null);
-      if (blobsWithCallbacks.Any())
+    return taskHandles;
+  }
+
+  private class BackgroundSubmitter : IAsyncDisposable
+  {
+    private readonly ArmoniKClient armoniKClient_;
+    private readonly SessionInfo   sessionInfo_;
+
+    /// <summary>
+    ///   Cancels any new submission.
+    /// </summary>
+    private readonly CancellationTokenSource submissionCts_;
+
+    private readonly Task submissionTask_;
+
+    private readonly Channel<(TaskDefinition, TaskHandle)> taskSubmissionChannel_;
+    private          bool                                  disposed_;
+
+    public BackgroundSubmitter(ArmoniKClient     armoniKClient,
+                               SessionInfo       sessionInfo,
+                               CancellationToken cancellationToken)
+    {
+      armoniKClient_ = armoniKClient;
+      sessionInfo_   = sessionInfo;
+      submissionCts_ = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+      taskSubmissionChannel_ = Channel.CreateUnbounded<(TaskDefinition, TaskHandle)>(new UnboundedChannelOptions
+                                                                                     {
+                                                                                       SingleReader = true,
+                                                                                       SingleWriter = true,
+                                                                                     });
+      submissionTask_ = Task.Run(RunSubmitterAsync);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+      if (!disposed_)
       {
-        var callbackRunner = CreateCallbackRunnerIfNeeded(cancellationToken);
+        disposed_ = true;
 
-        foreach (var blob in blobsWithCallbacks)
+        // Send an abort signal
+        submissionCts_.Cancel();
+
+        // Wait for the worker task to complete
+        await submissionTask_.ConfigureAwait(false);
+
+        submissionCts_.Dispose();
+      }
+    }
+
+    public void Add(TaskDefinition taskDefinition,
+                    TaskHandle     taskHandle)
+      => taskSubmissionChannel_.Writer.WriteAsync((taskDefinition, taskHandle));
+
+    /// <summary>
+    ///   Wait until all registered tasks are submitted.
+    /// </summary>
+    /// <returns>
+    ///   A task representing the asynchronous operation.
+    /// </returns>
+    public async Task WaitAsync()
+    {
+      if (taskSubmissionChannel_.Writer.TryComplete())
+      {
+        await submissionTask_.ConfigureAwait(false);
+        await DisposeAsync()
+          .ConfigureAwait(false);
+      }
+    }
+
+    private async Task RunSubmitterAsync()
+    {
+      var callbackRunner = new CallbackRunner(armoniKClient_,
+                                              submissionCts_.Token);
+      try
+      {
+        await foreach (var chunk in taskSubmissionChannel_.Reader.ToAsyncEnumerable(submissionCts_.Token)
+                                                          .ToChunksAsync(1000,
+                                                                         TimeSpan.FromSeconds(5),
+                                                                         submissionCts_.Token)
+                                                          .ConfigureAwait(false))
         {
-          callbackRunner.Add(blob);
+          var taskInfos = armoniKClient_.TasksService.SubmitTasksAsync(sessionInfo_,
+                                                                       chunk.ViewSelect(tuple => tuple.Item1),
+                                                                       submissionCts_.Token);
+
+          var enumTask = chunk.AsEnumerable()
+                              .GetEnumerator();
+          await foreach (var taskInfo in taskInfos.ConfigureAwait(false))
+          {
+            enumTask.MoveNext();
+            var taskDefinition = enumTask.Current.Item1;
+            var taskHandle     = enumTask.Current.Item2;
+            taskHandle.TaskInfosSource!.SetResult(taskInfo);
+
+            var blobsWithCallbacks = taskDefinition.Outputs.Values.Where(b => b.CallBack != null);
+            if (blobsWithCallbacks.Any())
+            {
+              foreach (var blob in blobsWithCallbacks)
+              {
+                callbackRunner.Add(blob);
+              }
+            }
+          }
         }
       }
+      catch (OperationCanceledException)
+      {
+      }
+      finally
+      {
+        // If submission was canceled, callbacks were canceled too,
+        // then there is no need to wait the callback runner to complete.
+        if (!submissionCts_.Token.IsCancellationRequested)
+        {
+          await callbackRunner.WaitAsync()
+                              .ConfigureAwait(false);
+        }
 
-      yield return new TaskHandle(ArmoniKClient,
-                                  taskInfo);
+        await callbackRunner.DisposeAsync()
+                            .ConfigureAwait(false);
+      }
     }
   }
 

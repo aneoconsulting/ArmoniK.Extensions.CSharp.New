@@ -56,10 +56,12 @@ public class TaskHandleTests
   private TaskInfos?           mockTaskInfos_;
 
   [Test]
-  public void ConstructorShouldInitializeProperties()
+  public async Task ConstructorShouldInitializeProperties()
   {
-    var taskHandle = new TaskHandle(mockedArmoniKClient_!,
-                                    mockTaskInfos_!);
+    var taskHandle = TaskHandle.FromTaskInfos(mockedArmoniKClient_!,
+                                              mockTaskInfos_!);
+    var convertedTaskInfos = await taskHandle.GetTaskInfosAsync()
+                                             .ConfigureAwait(false);
 
     Assert.Multiple(() =>
                     {
@@ -68,7 +70,6 @@ public class TaskHandleTests
                       Assert.That(taskHandle.ArmoniKClient,
                                   Is.InstanceOf<ArmoniKClient>());
 
-                      TaskInfos convertedTaskInfos = taskHandle;
                       Assert.That(convertedTaskInfos,
                                   Is.EqualTo(mockTaskInfos_));
                     });
@@ -76,48 +77,38 @@ public class TaskHandleTests
 
   [Test]
   public void ConstructorThrowsArgumentNullExceptionWhenClientIsNull()
-    => Assert.That(() => new TaskHandle(null!,
-                                        mockTaskInfos_!),
+    => Assert.That(() => TaskHandle.FromTaskInfos(null!,
+                                                  mockTaskInfos_!),
                    Throws.ArgumentNullException.With.Property(nameof(ArgumentNullException.ParamName))
                          .EqualTo("armoniKClient"));
 
   [Test]
   public void ConstructorThrowsArgumentNullExceptionWhenTaskInfosIsNull()
-    => Assert.That(() => new TaskHandle(mockedArmoniKClient_!,
-                                        null!),
+    => Assert.That(() => TaskHandle.FromTaskInfos(mockedArmoniKClient_!,
+                                                  null!),
                    Throws.ArgumentNullException.With.Property(nameof(ArgumentNullException.ParamName))
-                         .EqualTo("taskInfo"));
+                         .EqualTo("taskInfos"));
 
   [Test]
-  public void ImplicitConversionToTaskInfosShouldReturnCorrectTaskInfos()
+  public async Task ImplicitConversionToTaskInfosShouldReturnCorrectTaskInfos()
   {
-    var taskHandle = new TaskHandle(mockedArmoniKClient_!,
-                                    mockTaskInfos_!);
+    var taskHandle = TaskHandle.FromTaskInfos(mockedArmoniKClient_!,
+                                              mockTaskInfos_!);
 
-    TaskInfos convertedTaskInfos = taskHandle;
+    var convertedTaskInfos = await taskHandle.GetTaskInfosAsync()
+                                             .ConfigureAwait(false);
 
     Assert.That(convertedTaskInfos,
                 Is.EqualTo(mockTaskInfos_));
   }
 
   [Test]
-  public void ImplicitConversionToTaskInfosThrowsArgumentNullExceptionWhenHandleIsNull()
+  public async Task FromTaskInfosCreatesTaskHandleCorrectly()
   {
-    TaskHandle? nullHandle = null;
-
-    Assert.That(() =>
-                {
-                  TaskInfos _ = nullHandle!;
-                },
-                Throws.ArgumentNullException.With.Property(nameof(ArgumentNullException.ParamName))
-                      .EqualTo("taskHandle"));
-  }
-
-  [Test]
-  public void FromTaskInfosCreatesTaskHandleCorrectly()
-  {
-    var taskHandle = TaskHandle.FromTaskInfos(mockTaskInfos_!,
-                                              mockedArmoniKClient_!);
+    var taskHandle = TaskHandle.FromTaskInfos(mockedArmoniKClient_!,
+                                              mockTaskInfos_!);
+    var convertedTaskInfos = await taskHandle.GetTaskInfosAsync()
+                                             .ConfigureAwait(false);
 
     Assert.Multiple(() =>
                     {
@@ -126,7 +117,6 @@ public class TaskHandleTests
                       Assert.That(taskHandle.ArmoniKClient,
                                   Is.InstanceOf<ArmoniKClient>());
 
-                      TaskInfos convertedTaskInfos = taskHandle;
                       Assert.That(convertedTaskInfos,
                                   Is.EqualTo(mockTaskInfos_));
                     });
@@ -134,23 +124,23 @@ public class TaskHandleTests
 
   [Test]
   public void FromTaskInfosThrowsArgumentNullExceptionWhenTaskInfosIsNull()
-    => Assert.That(() => TaskHandle.FromTaskInfos(null!,
-                                                  mockedArmoniKClient_!),
+    => Assert.That(() => TaskHandle.FromTaskInfos(mockedArmoniKClient_!,
+                                                  null!),
                    Throws.ArgumentNullException.With.Property(nameof(ArgumentNullException.ParamName))
                          .EqualTo("taskInfos"));
 
   [Test]
   public void FromTaskInfosThrowsArgumentNullExceptionWhenClientIsNull()
-    => Assert.That(() => TaskHandle.FromTaskInfos(mockTaskInfos_!,
-                                                  null!),
+    => Assert.That(() => TaskHandle.FromTaskInfos(null!,
+                                                  mockTaskInfos_!),
                    Throws.ArgumentNullException.With.Property(nameof(ArgumentNullException.ParamName))
                          .EqualTo("armoniKClient"));
 
   [Test]
   public void ImplicitConversionWorksInMethodParameters()
   {
-    var taskHandle = new TaskHandle(mockedArmoniKClient_!,
-                                    mockTaskInfos_!);
+    var taskHandle = TaskHandle.FromTaskInfos(mockedArmoniKClient_!,
+                                              mockTaskInfos_!);
 
     Assert.That(() => Assert.That(taskHandle,
                                   Is.Not.Null),
@@ -160,8 +150,8 @@ public class TaskHandleTests
   [Test]
   public void GetTaskDetailsAsyncWithCancellationTokenCancels()
   {
-    var taskHandle = new TaskHandle(mockedArmoniKClient_!,
-                                    mockTaskInfos_!);
+    var taskHandle = TaskHandle.FromTaskInfos(mockedArmoniKClient_!,
+                                              mockTaskInfos_!);
 
     var cancellationTokenSource = new CancellationTokenSource();
     cancellationTokenSource.Cancel();

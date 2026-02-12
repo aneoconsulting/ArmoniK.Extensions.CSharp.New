@@ -33,9 +33,15 @@ public class TaskHandle
   public readonly ArmoniKClient ArmoniKClient;
 
   /// <summary>
+  ///   Promise of the TaskInfos when the task as been submitted.
+  ///   It needs to be volatile as we need it to play the role of a barrier in GetTaskInfosAsync().
+  /// </summary>
+  private volatile TaskCompletionSource<TaskInfos>? taskInfosSource_;
+
+  /// <summary>
   ///   Gets the task information for which this handle will perform operations.
   /// </summary>
-  private readonly TaskInfos taskInfos_;
+  private TaskInfos? taskInfos_;
 
   /// <summary>
   ///   Initializes a new instance of the <see cref="TaskHandle" /> class with a specified ArmoniK client and task
@@ -43,35 +49,83 @@ public class TaskHandle
   /// </summary>
   /// <param name="armoniKClient">The ArmoniK client to be used for task service operations.</param>
   /// <param name="taskInfo">The task information related to the tasks that will be handled.</param>
+  /// <param name="source">The task information related to the tasks that will be handled.</param>
   /// <exception cref="ArgumentNullException">Thrown when armoniKClient or taskInfo is null.</exception>
-  public TaskHandle(ArmoniKClient armoniKClient,
-                    TaskInfos     taskInfo)
+  private TaskHandle(ArmoniKClient                    armoniKClient,
+                     TaskInfos?                       taskInfo,
+                     TaskCompletionSource<TaskInfos>? source)
   {
-    ArmoniKClient = armoniKClient ?? throw new ArgumentNullException(nameof(armoniKClient));
-    taskInfos_    = taskInfo      ?? throw new ArgumentNullException(nameof(taskInfo));
+    ArmoniKClient    = armoniKClient;
+    taskInfos_       = taskInfo;
+    taskInfosSource_ = source;
   }
 
   /// <summary>
-  ///   Implicit conversion operator from TaskHandle to TaskInfos.
-  ///   Allows TaskHandle to be used wherever TaskInfos is expected.
+  ///   The TaskCompletionSource valued by the task submission.
   /// </summary>
-  /// <param name="taskHandle">The TaskHandle to convert.</param>
-  /// <returns>The TaskInfos contained within the TaskHandle.</returns>
-  /// <exception cref="ArgumentNullException">Thrown when taskHandle is null.</exception>
-  public static implicit operator TaskInfos(TaskHandle taskHandle)
-    => taskHandle?.taskInfos_ ?? throw new ArgumentNullException(nameof(taskHandle));
+  internal TaskCompletionSource<TaskInfos>? TaskInfosSource
+    => taskInfosSource_;
 
   /// <summary>
-  ///   Creates a TaskHandle from TaskInfos and ArmoniKClient.
+  ///   Creates a TaskHandle from a TaskInfos and ArmoniKClient.
   /// </summary>
-  /// <param name="taskInfos">The TaskInfos to wrap.</param>
   /// <param name="armoniKClient">The ArmoniK client for operations.</param>
+  /// <param name="taskInfos">The TaskInfos to wrap.</param>
   /// <returns>A new TaskHandle instance.</returns>
   /// <exception cref="ArgumentNullException">Thrown when taskInfos or armoniKClient is null.</exception>
-  public static TaskHandle FromTaskInfos(TaskInfos     taskInfos,
-                                         ArmoniKClient armoniKClient)
+  public static TaskHandle FromTaskInfos(ArmoniKClient armoniKClient,
+                                         TaskInfos     taskInfos)
     => new(armoniKClient ?? throw new ArgumentNullException(nameof(armoniKClient)),
-           taskInfos     ?? throw new ArgumentNullException(nameof(taskInfos)));
+           taskInfos     ?? throw new ArgumentNullException(nameof(taskInfos)),
+           null);
+
+  /// <summary>
+  ///   Creates a TaskHandle from a TaskCompletionSource and ArmoniKClient.
+  /// </summary>
+  /// <param name="armoniKClient">The ArmoniK client for operations.</param>
+  /// <param name="source">The TaskInfos's source</param>
+  /// <returns>A new TaskHandle instance.</returns>
+  /// <exception cref="ArgumentNullException">Thrown when source or armoniKClient is null.</exception>
+  public static TaskHandle FromTaskCompletionSourceOfTaskInfos(ArmoniKClient                    armoniKClient,
+                                                               TaskCompletionSource<TaskInfos>? source = null)
+    => new(armoniKClient ?? throw new ArgumentNullException(nameof(armoniKClient)),
+           null,
+           source ?? new TaskCompletionSource<TaskInfos>());
+
+  /// <summary>
+  ///   Get the TaskInfo instance.
+  /// </summary>
+  /// <returns>A task representing the asynchronous operation. The task result contains the TaskInfo instance</returns>
+  public ValueTask<TaskInfos> GetTaskInfosAsync()
+  {
+    var taskInfos = taskInfos_;
+    if (taskInfos is not null)
+    {
+      return new ValueTask<TaskInfos>(taskInfos);
+    }
+
+    return Core();
+
+    async ValueTask<TaskInfos> Core()
+    {
+      // volatile read of taskInfosSource_ here has acquire semantics and with the combination
+      // of the volatile write of taskInfosSource_ below, it ensures that if we see a null value for taskInfosSource_,
+      // we are guaranteed to see a non-null value for taskInfos_.
+      var tcs = taskInfosSource_;
+      if (tcs is null)
+      {
+        return taskInfos_!;
+      }
+
+      var taskInfos = await tcs.Task.ConfigureAwait(false);
+      taskInfos_ = taskInfos;
+      // volatile write of taskInfosSource_ here has release semantics (allows other threads to see the effects of preceding operations).
+      // This prevent the compiler to do some operation reordering, then we are sure taskInfos_ has actually been assigned when we reach that point
+      // therefore if a thread can see a null taskInfosSource_, it is guaranteed to see a non-null taskInfos_.
+      taskInfosSource_ = null;
+      return taskInfos;
+    }
+  }
 
   /// <summary>
   ///   Asynchronously retrieves detailed state information about the task associated with this handle.
@@ -82,7 +136,11 @@ public class TaskHandle
   ///   the result.
   /// </returns>
   public async Task<TaskState> GetTaskDetailsAsync(CancellationToken cancellationToken)
-    => await ArmoniKClient.TasksService.GetTasksDetailedAsync(taskInfos_.TaskId,
-                                                              cancellationToken)
-                          .ConfigureAwait(false);
+  {
+    var taskInfos = await GetTaskInfosAsync()
+                      .ConfigureAwait(false);
+    return await ArmoniKClient.TasksService.GetTasksDetailedAsync(taskInfos.TaskId,
+                                                                  cancellationToken)
+                              .ConfigureAwait(false);
+  }
 }

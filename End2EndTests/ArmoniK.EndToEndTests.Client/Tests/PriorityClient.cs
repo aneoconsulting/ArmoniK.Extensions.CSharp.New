@@ -70,12 +70,9 @@ public class PriorityClient : ClientBase
       }
 
       allTasks.AddRange(taskDefinitions);
-      foreach (var taskDefinition in taskDefinitions)
-      {
-        await SessionHandle!.SubmitAsync([taskDefinition])
-                            .SingleAsync()
-                            .ConfigureAwait(false);
-      }
+      SessionHandle!.Submit(taskDefinitions);
+      await SessionHandle.WaitCallbacksAsync()
+                         .ConfigureAwait(false);
 
       taskDefinitions.Clear();
     }
