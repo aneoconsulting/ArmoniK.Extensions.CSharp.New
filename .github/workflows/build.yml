@@ -80,7 +80,7 @@ jobs:
 
     - name: Pack the package VERSION
       run: |
-        dotnet pack ArmoniK.Extensions.Csharp.sln -c Release --no-build -o /tmp/packages 
+        dotnet pack ArmoniK.Extensions.Csharp.sln -c Release -o /tmp/packages 
           -p:Version=${{ needs.versionning.outputs.version }} \
           -p:PackageVersion=${{ needs.versionning.outputs.version }} \
           --output ./artifacts
