@@ -82,8 +82,7 @@ jobs:
       run: |
         dotnet pack ArmoniK.Extensions.CSharp.sln -c Release -o /tmp/packages \
           -p:Version=${{ needs.versionning.outputs.version }} \
-          -p:PackageVersion=${{ needs.versionning.outputs.version }} \
-          --output ./artifacts
+          -p:PackageVersion=${{ needs.versionning.outputs.version }}
 
     - name: Push the package
       run: |
