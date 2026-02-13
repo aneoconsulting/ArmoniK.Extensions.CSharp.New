@@ -40,9 +40,9 @@ jobs:
     - name: Build the solution
       run: |
         dotnet build ArmoniK.Extensions.CSharp.sln -c Release --no-restore \
-          -p:Version=${{ needs.version.outputs.version }} \
-          -p:AssemblyVersion=${{ needs.version.outputs.version }} \
-          -p:FileVersion=${{ needs.version.outputs.version }} \
+          -p:Version=${{ needs.versionning.outputs.version }} \
+          -p:AssemblyVersion=${{ needs.versionning.outputs.version }} \
+          -p:FileVersion=${{ needs.versionning.outputs.version }} \
           -warnAsError:"CS1570;CS1571;CS1572;CS1573;CS1587;CS1591"
               
   runTests:
@@ -81,8 +81,8 @@ jobs:
     - name: Pack the package VERSION
       run: |
         dotnet pack ArmoniK.Extensions.Csharp.sln -c Release --no-build -o /tmp/packages 
-          -p:Version=${{ needs.version.outputs.version }} \
-          -p:PackageVersion=${{ needs.version.outputs.version }} \
+          -p:Version=${{ needs.versionning.outputs.version }} \
+          -p:PackageVersion=${{ needs.versionning.outputs.version }} \
           --output ./artifacts
 
     - name: Push the package
@@ -130,4 +130,4 @@ jobs:
           linux/amd64
         push: true
         tags: |
-            dockerhubaneo/armonik-dynamic-dotnet-worker:${{ needs.version.outputs.version }}
+            dockerhubaneo/armonik-dynamic-dotnet-worker:${{ needs.versionning.outputs.version }}
