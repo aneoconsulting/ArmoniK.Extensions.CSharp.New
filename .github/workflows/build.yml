@@ -18,15 +18,17 @@ jobs:
         fetch-tags: true
         fetch-depth: 0
     
+    - name: Setup zerv
+      uses: taiki-e/install-action@7646916979096be288829d3d80a5e43636357a04 # v2
+      with:
+        tool: zerv
+        
     - name: Generate version from git describe
       id: version
       run: |
         # Fetch git describe
-        GIT_DESCRIBE=$(git describe --tags --long --always --dirty)
-        VERSION=$(echo $GIT_DESCRIBE)
-        SEMVER=$(echo $GIT_DESCRIBE| sed -E 's/^v?([0-9]+\.[0-9]+\.[0-9]+)-([0-9]+)-g[0-9a-f]+$/\1-pre.\2/')
+        VERSION=$(zerv version)
         echo "version=$VERSION" >> $GITHUB_OUTPUT
-        echo "semver=$SEMVER" >> $GITHUB_OUTPUT
 
   buildProject:
     runs-on: ubuntu-latest
@@ -84,9 +86,8 @@ jobs:
     - name: Pack the package VERSION
       run: |
         dotnet pack ArmoniK.Extensions.CSharp.sln -c Release -o /tmp/packages \
-          -p:Version=${{ needs.versionning.outputs.semver }} \
-          -p:AssemblyVersion=${{ needs.versionning.outputs.version }} \
-          -p:PackageVersion=${{ needs.versionning.outputs.semver }}
+          -p:Version=${{ needs.versionning.outputs.version }} \
+          -p:PackageVersion=${{ needs.versionning.outputs.version }}
 
     - name: Push the package
       run: |
