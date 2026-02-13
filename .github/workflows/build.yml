@@ -41,7 +41,7 @@ jobs:
       run: |
         dotnet build ArmoniK.Extensions.CSharp.sln -c Release --no-restore \
           -p:Version=${{ needs.versionning.outputs.version }} \
-          -p:AssemblyVersion=${{ needs.versionning.outputs.version }} \
+          -p:PackageVersion=${{ needs.versionning.outputs.version }} \
           -p:FileVersion=${{ needs.versionning.outputs.version }} \
           -warnAsError:"CS1570;CS1571;CS1572;CS1573;CS1587;CS1591"
               
