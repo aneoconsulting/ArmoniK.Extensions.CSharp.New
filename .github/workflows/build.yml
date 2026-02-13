@@ -13,6 +13,7 @@ jobs:
       with:
         ref: ${{ github.ref }}
         fetch-tags: true
+        fetch-depth: 0
 
     - name: Generate version from git describe
       id: version
