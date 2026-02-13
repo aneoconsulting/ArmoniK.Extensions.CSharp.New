@@ -5,6 +5,7 @@
     <LangVersion>12.0</LangVersion>
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
     <Nullable>enable</Nullable>
+	<IsPackable>true</IsPackable>
   </PropertyGroup>
 
   <ItemGroup>
