@@ -12,7 +12,7 @@ jobs:
       uses: actions/checkout@v3
       with:
         ref: ${{ github.ref }}
-        submodules: true
+        fetch-tags: true
 
     - name: Generate version from git describe
       id: version
