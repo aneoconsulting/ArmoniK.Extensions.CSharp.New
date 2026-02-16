@@ -60,10 +60,10 @@ jobs:
         submodules: true
     - name: Build the package
       run: |
-        dotnet build ArmoniK.Extensions.Csharp.sln -c Release -p:Version=${{ github.ref_name }}
+        dotnet build ArmoniK.Extensions.CSharp.sln -c Release -p:Version=${{ github.ref_name }}
     - name: Pack the package VERSION
       run: |
-        dotnet pack ArmoniK.Extensions.Csharp.sln -c Release -o /tmp/packages -p:Version=${{ github.ref_name }}
+        dotnet pack ArmoniK.Extensions.CSharp.sln -c Release -o /tmp/packages -p:Version=${{ github.ref_name }}
     - name: Push the package
       run: |
         dotnet nuget push /tmp/packages/ArmoniK* -k ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate --no-symbols
