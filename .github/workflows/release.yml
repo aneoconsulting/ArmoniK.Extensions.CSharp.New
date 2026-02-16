@@ -73,4 +73,4 @@ on:
         dotnet pack ArmoniK.Extensions.Csharp.sln -c Release -o /tmp/packages -p:Version=${{ github.ref_name }}
     - name: Push the package
       run: |
-        dotnet nuget push {} -k ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate --no-symbols \;
+        dotnet nuget push -k ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate --no-symbols
