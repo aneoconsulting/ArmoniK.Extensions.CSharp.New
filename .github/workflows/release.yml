@@ -58,14 +58,6 @@ jobs:
       with:
         ref: ${{ github.ref }}
         submodules: true
-
-    - name: Install .NET Core
-      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
-      with:
-        dotnet-version: |
-          netstandard2.0
-          8.x
-
     - name: Build the package
       run: |
         dotnet build ArmoniK.Extensions.Csharp.sln -c Release -p:Version=${{ github.ref_name }}
