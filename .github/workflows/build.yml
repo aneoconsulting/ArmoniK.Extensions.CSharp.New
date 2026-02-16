@@ -5,21 +5,51 @@ on:
       - release
 
 jobs:
-  buildProject:
+  versionning:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
     steps:
     - name: Checkout
       uses: actions/checkout@v3
       with:
         ref: ${{ github.ref }}
-        submodules: true
+        fetch-tags: true
+        fetch-depth: 0
+    
+    - name: Setup zerv
+      uses: taiki-e/install-action@7646916979096be288829d3d80a5e43636357a04 # v2
+      with:
+        tool: zerv
+        
+    - name: Generate version from git describe
+      id: version
+      run: |
+        # Fetch git describe
+        VERSION=$(zerv flow --schema standard-base-context --output-template "{{ semver_obj.docker }}")
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+  buildProject:
+    runs-on: ubuntu-latest
+    needs: versionning
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        ref: ${{ github.ref }}
 
     - name: Restore dependencies
       run: dotnet restore
 
     - name: Build the solution
-      run: dotnet build ArmoniK.Extensions.CSharp.sln -c Release -warnAsError:"CS1570;CS1571;CS1572;CS1573;CS1587;CS1591"
-
+      run: |
+        dotnet build ArmoniK.Extensions.CSharp.sln -c Release --no-restore \
+          -p:Version=${{ needs.versionning.outputs.version }} \
+          -p:PackageVersion=${{ needs.versionning.outputs.version }} \
+          -p:FileVersion=${{ needs.versionning.outputs.version }} \
+          -warnAsError:"CS1570;CS1571;CS1572;CS1573;CS1587;CS1591"
+              
   runTests:
     needs: buildProject
     runs-on: ubuntu-latest
@@ -41,3 +71,67 @@ jobs:
 
     - name: Run Tests
       run: dotnet test Tests/Tests.csproj -c Release --verbosity normal
+
+  publish:
+    needs:
+    - versionning
+    - runTests
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        ref: ${{ github.ref }}
+
+    - name: Pack the package VERSION
+      run: |
+        dotnet pack ArmoniK.Extensions.CSharp.sln -c Release -o /tmp/packages \
+          -p:Version=${{ needs.versionning.outputs.version }} \
+          -p:PackageVersion=${{ needs.versionning.outputs.version }}
+
+    - name: Push the package
+      run: |
+        dotnet nuget push /tmp/packages/ArmoniK* -k ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate --no-symbols
+
+  buildImages:
+    runs-on: ubuntu-latest
+    needs:
+      - versionning
+      - runTests
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+        - img : dockerhubaneo/armonik_csharp_dynamic_worker
+          path : ./ArmoniK.Extensions.CSharp.DynamicWorker/Dockerfile
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        ref: ${{ github.ref }}
+
+    - name: Set up Docker Buildx
+      id: buildx
+      uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3
+
+    - name: login
+      uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3
+      with:
+        username: ${{ secrets.DOCKER_HUB_LOGIN }}
+        password: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+    - name: platforms
+      run: echo ${{ steps.buildx.outputs.platforms }}
+
+    - name: Build and push
+      uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
+      with:
+        file: ./ArmoniK.Extensions.CSharp.DynamicWorker/Dockerfile
+        context: .
+        platforms: |
+          linux/arm64
+          linux/amd64
+        push: true
+        tags: |
+            dockerhubaneo/armonik-dynamic-dotnet-worker:${{ needs.versionning.outputs.version }}
