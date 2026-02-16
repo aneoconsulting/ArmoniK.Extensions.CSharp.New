@@ -27,7 +27,7 @@ jobs:
       id: version
       run: |
         # Fetch git describe
-        VERSION=$(zerv version)
+        VERSION=$(zerv flow --schema standard-base-context --output-template "{{ semver_obj.docker }}")
         echo "version=$VERSION" >> $GITHUB_OUTPUT
 
   buildProject:
