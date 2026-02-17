@@ -298,9 +298,9 @@ public class SessionHandle : IAsyncDisposable, IDisposable
 
   private class BackgroundSubmitter : IAsyncDisposable
   {
-    private readonly ArmoniKClient                armoniKClient_;
-    private readonly ILogger<BackgroundSubmitter> logger_;
-    private readonly SessionInfo                  sessionInfo_;
+    private readonly ArmoniKClient armoniKClient_;
+    private readonly ILogger       logger_;
+    private readonly SessionInfo   sessionInfo_;
 
     /// <summary>
     ///   Cancels any new submission.
@@ -387,8 +387,8 @@ public class SessionHandle : IAsyncDisposable, IDisposable
           }
           catch (Exception ex)
           {
-            logger_.LogError("Failure to submit Tasks: {Ex}",
-                             ex);
+            logger_.LogError(ex,
+                             "Failure to submit Tasks");
             foreach (var task in chunk)
             {
               var taskHandle = task.Item2;

@@ -34,6 +34,7 @@ public class TaskSdkClient : ClientBase
     => await TearDownBaseAsync()
          .ConfigureAwait(false);
 
+  [Test]
   [TestCase(100)]
   [TestCase(100000)]
   public async Task TaskSdk(int size)
