@@ -35,13 +35,16 @@ public class TaskSdkClient : ClientBase
          .ConfigureAwait(false);
 
   [Test]
-  public async Task TaskSdk()
+  [TestCase(100)]
+  [TestCase(100000)]
+  public async Task TaskSdk(int size)
   {
+    var str      = $"String of size {size}: {new string('A', size)}";
     var callback = new Callback();
     var taskDefinition = new TaskDefinition().WithLibrary(WorkerLibrary!)
                                              .WithInput("inputString",
                                                         BlobDefinition.FromString("blobInputString",
-                                                                                  "Hello world!"))
+                                                                                  str))
                                              .WithOutput("outputString",
                                                          BlobDefinition.CreateOutput("blobOutputString")
                                                                        .WithCallback(callback))
@@ -70,20 +73,23 @@ public class TaskSdkClient : ClientBase
                       Assert.That(outputBlobHandle!.BlobInfo.BlobName,
                                   Is.EqualTo("blobOutputString"));
                       Assert.That(resultString,
-                                  Is.EqualTo("Hello world!"));
+                                  Is.EqualTo(str));
                     });
   }
 
-  [Test]
-  public async Task NumerousCallbacks()
+  [TestCase(100,
+            100)]
+  public async Task NumerousCallbacks(int N,
+                                      int size)
   {
     var taskDefinitions = new List<TaskDefinition>();
-    for (var i = 0; i < 100; i++)
+    var str             = $"String of size {size}: {new string('A', size)}";
+    for (var i = 0; i < N; i++)
     {
       taskDefinitions.Add(new TaskDefinition().WithLibrary(WorkerLibrary!)
                                               .WithInput("inputString",
                                                          BlobDefinition.FromString("blobInputString" + i,
-                                                                                   "Hello world!"))
+                                                                                   str))
                                               .WithOutput("outputString",
                                                           BlobDefinition.CreateOutput("blobOutputString" + i)
                                                                         .WithCallback(new Callback()))
@@ -100,7 +106,7 @@ public class TaskSdkClient : ClientBase
                                                                 .Value.CallBack!).Result);
 
       Assert.That(resultString,
-                  Is.EqualTo("Hello world!"));
+                  Is.EqualTo(str));
     }
   }
 

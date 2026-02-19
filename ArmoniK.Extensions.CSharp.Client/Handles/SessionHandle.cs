@@ -30,8 +30,11 @@ using ArmoniK.Extensions.CSharp.Client.Exceptions;
 using ArmoniK.Extensions.CSharp.Client.Queryable;
 using ArmoniK.Extensions.CSharp.Client.Services;
 using ArmoniK.Extensions.CSharp.Common.Common.Domain.Blob;
+using ArmoniK.Extensions.CSharp.Common.Common.Domain.Task;
 using ArmoniK.Extensions.CSharp.Common.Library;
 using ArmoniK.Utils;
+
+using Microsoft.Extensions.Logging;
 
 namespace ArmoniK.Extensions.CSharp.Client.Handles;
 
@@ -296,6 +299,7 @@ public class SessionHandle : IAsyncDisposable, IDisposable
   private class BackgroundSubmitter : IAsyncDisposable
   {
     private readonly ArmoniKClient armoniKClient_;
+    private readonly ILogger       logger_;
     private readonly SessionInfo   sessionInfo_;
 
     /// <summary>
@@ -321,6 +325,7 @@ public class SessionHandle : IAsyncDisposable, IDisposable
                                                                                        SingleWriter = true,
                                                                                      });
       submissionTask_ = Task.Run(RunSubmitterAsync);
+      logger_         = armoniKClient.LoggerFactory.CreateLogger<BackgroundSubmitter>();
     }
 
     public async ValueTask DisposeAsync()
@@ -371,13 +376,31 @@ public class SessionHandle : IAsyncDisposable, IDisposable
                                                                          submissionCts_.Token)
                                                           .ConfigureAwait(false))
         {
-          var taskInfos = armoniKClient_.TasksService.SubmitTasksAsync(sessionInfo_,
-                                                                       chunk.ViewSelect(tuple => tuple.Item1),
-                                                                       submissionCts_.Token);
+          TaskInfos[]? taskInfos = null;
+          try
+          {
+            taskInfos = await armoniKClient_.TasksService.SubmitTasksAsync(sessionInfo_,
+                                                                           chunk.ViewSelect(tuple => tuple.Item1),
+                                                                           submissionCts_.Token)
+                                            .ToArrayAsync(submissionCts_.Token)
+                                            .ConfigureAwait(false);
+          }
+          catch (Exception ex)
+          {
+            logger_.LogError(ex,
+                             "Failure to submit Tasks");
+            foreach (var task in chunk)
+            {
+              var taskHandle = task.Item2;
+              taskHandle.TaskInfosSource!.SetException(ex);
+            }
+
+            continue;
+          }
 
           var enumTask = chunk.AsEnumerable()
                               .GetEnumerator();
-          await foreach (var taskInfo in taskInfos.ConfigureAwait(false))
+          foreach (var taskInfo in taskInfos)
           {
             enumTask.MoveNext();
             var taskDefinition = enumTask.Current.Item1;

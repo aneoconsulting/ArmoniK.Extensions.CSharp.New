@@ -462,6 +462,8 @@ public class BlobService : IBlobService
     } while (await chunkEnumerator.MoveNextAsync(cancellationToken)
                                   .ConfigureAwait(false));
 
+    await stream.RequestStream.CompleteAsync()
+                .ConfigureAwait(false);
     return await stream.ResponseAsync.ConfigureAwait(false);
   }
 
