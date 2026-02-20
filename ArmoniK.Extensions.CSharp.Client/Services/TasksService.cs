@@ -32,6 +32,7 @@ using ArmoniK.Extensions.CSharp.Client.Common.Services;
 using ArmoniK.Extensions.CSharp.Common.Common.Domain.Task;
 using ArmoniK.Extensions.CSharp.Common.Library;
 using ArmoniK.Utils;
+using ArmoniK.Utils.Pool;
 
 using Grpc.Core;
 
