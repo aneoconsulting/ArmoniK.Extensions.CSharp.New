@@ -34,6 +34,7 @@ using ArmoniK.Extensions.CSharp.Client.Queryable;
 using ArmoniK.Extensions.CSharp.Client.Queryable.BlobState;
 using ArmoniK.Extensions.CSharp.Common.Common.Domain.Blob;
 using ArmoniK.Utils;
+using ArmoniK.Utils.Pool;
 
 using Google.Protobuf;
 
@@ -157,10 +158,30 @@ public class BlobService : IBlobService
                                                        SessionId = blobInfo.SessionId,
                                                      },
                                                      cancellationToken: cancellationToken);
-    while (await stream.ResponseStream.MoveNext(cancellationToken)
-                       .ConfigureAwait(false))
+    byte[] chunk;
+    while (true)
     {
-      yield return stream.ResponseStream.Current.DataChunk.ToByteArray();
+      try
+      {
+        if (!await stream.ResponseStream.MoveNext(cancellationToken)
+                         .ConfigureAwait(false))
+        {
+          break;
+        }
+
+        chunk = stream.ResponseStream.Current.DataChunk.ToByteArray();
+      }
+      catch (Exception ex)
+      {
+        channel.Exception = ex;
+        throw;
+      }
+      finally
+      {
+        stream.Dispose();
+      }
+
+      yield return chunk;
     }
   }
 
@@ -432,15 +453,23 @@ public class BlobService : IBlobService
     var blobClient = new Results.ResultsClient(channel);
 
     using var stream = blobClient.UploadResultData(cancellationToken: cancellationToken);
-    await stream.RequestStream.WriteAsync(new UploadResultDataRequest
-                                          {
-                                            Id = new UploadResultDataRequest.Types.ResultIdentifier
-                                                 {
-                                                   ResultId  = blobDefinition.BlobHandle!.BlobInfo.BlobId,
-                                                   SessionId = blobDefinition.BlobHandle!.BlobInfo.SessionId,
-                                                 },
-                                          })
-                .ConfigureAwait(false);
+    try
+    {
+      await stream.RequestStream.WriteAsync(new UploadResultDataRequest
+                                            {
+                                              Id = new UploadResultDataRequest.Types.ResultIdentifier
+                                                   {
+                                                     ResultId  = blobDefinition.BlobHandle!.BlobInfo.BlobId,
+                                                     SessionId = blobDefinition.BlobHandle!.BlobInfo.SessionId,
+                                                   },
+                                            })
+                  .ConfigureAwait(false);
+    }
+    catch (Exception ex)
+    {
+      channel.Exception = ex;
+      throw;
+    }
 
     if (chunkEnumerator == null)
     {
@@ -448,23 +477,32 @@ public class BlobService : IBlobService
                                                     cancellationToken)
                                       .GetAsyncEnumerator(cancellationToken);
       // Let's move next to be positioned on the first element
-      await chunkEnumerator.MoveNextAsync(cancellationToken)
+      await chunkEnumerator.MoveNextAsync()
                            .ConfigureAwait(false);
     }
 
-    do
+    try
     {
-      await stream.RequestStream.WriteAsync(new UploadResultDataRequest
-                                            {
-                                              DataChunk = UnsafeByteOperations.UnsafeWrap(chunkEnumerator.Current),
-                                            })
+      do
+      {
+        await stream.RequestStream.WriteAsync(new UploadResultDataRequest
+                                              {
+                                                DataChunk = UnsafeByteOperations.UnsafeWrap(chunkEnumerator.Current),
+                                              })
+                    .ConfigureAwait(false);
+      } while (await chunkEnumerator.MoveNextAsync()
+                                    .ConfigureAwait(false));
+
+      await stream.RequestStream.CompleteAsync()
                   .ConfigureAwait(false);
-    } while (await chunkEnumerator.MoveNextAsync(cancellationToken)
-                                  .ConfigureAwait(false));
-
-    return await stream.ResponseAsync.ConfigureAwait(false);
+      return await stream.ResponseAsync.ConfigureAwait(false);
+    }
+    catch (Exception ex)
+    {
+      channel.Exception = ex;
+      throw;
+    }
   }
-
 
   private async Task UploadBlobAsync(BlobInfo              blob,
                                      ReadOnlyMemory<byte>  blobContent,
@@ -530,7 +568,7 @@ public class BlobService : IBlobService
           var chunkEnumerator = blobDefinition.GetDataAsync(serviceConfiguration_!.DataChunkMaxSize,
                                                             cancellationToken)
                                               .GetAsyncEnumerator(cancellationToken);
-          await chunkEnumerator.MoveNextAsync(cancellationToken)
+          await chunkEnumerator.MoveNextAsync()
                                .ConfigureAwait(false);
           if (!chunkEnumerator.Current.IsEmpty)
           {
