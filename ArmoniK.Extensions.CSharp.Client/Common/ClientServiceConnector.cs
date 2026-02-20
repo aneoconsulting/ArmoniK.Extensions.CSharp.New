@@ -18,7 +18,7 @@ using System.Threading.Tasks;
 
 using ArmoniK.Api.Client.Options;
 using ArmoniK.Api.Client.Submitter;
-using ArmoniK.Utils;
+using ArmoniK.Utils.Pool;
 
 using Grpc.Core;
 
@@ -54,7 +54,8 @@ public class ClientServiceConnector
                     InitialBackOff        = properties.RetryInitialBackoff,
                   };
 
-    return new ObjectPool<ChannelBase>(ct => new ValueTask<ChannelBase>(GrpcChannelFactory.CreateChannel(options,
+    return new ObjectPool<ChannelBase>(int.MaxValue,
+                                       ct => new ValueTask<ChannelBase>(GrpcChannelFactory.CreateChannel(options,
                                                                                                          loggerFactory?.CreateLogger(typeof(ClientServiceConnector)))),
 
 #if NET5_0_OR_GREATER
