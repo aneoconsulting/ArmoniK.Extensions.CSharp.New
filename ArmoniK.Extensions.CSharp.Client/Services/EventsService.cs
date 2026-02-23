@@ -24,7 +24,7 @@ using ArmoniK.Api.gRPC.V1.Events;
 using ArmoniK.Extensions.CSharp.Client.Common.Domain.Session;
 using ArmoniK.Extensions.CSharp.Client.Common.Services;
 using ArmoniK.Extensions.CSharp.Common.Common.Domain.Blob;
-using ArmoniK.Utils;
+using ArmoniK.Utils.Pool;
 
 using Grpc.Core;
 

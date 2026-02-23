@@ -20,7 +20,7 @@ using System.Threading.Tasks;
 using ArmoniK.Api.gRPC.V1.Versions;
 using ArmoniK.Extensions.CSharp.Client.Common.Domain.Versions;
 using ArmoniK.Extensions.CSharp.Client.Common.Services;
-using ArmoniK.Utils;
+using ArmoniK.Utils.Pool;
 
 using Grpc.Core;
 

@@ -10,7 +10,7 @@
 
   <ItemGroup>
   <InternalsVisibleTo Include="Tests" />
-    <PackageReference Include="ArmoniK.Api.Client" Version="3.26.0" />
+    <PackageReference Include="ArmoniK.Api.Client" Version="3.28.3" />
     <PackageReference Include="IsExternalInit" Version="1.0.3">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

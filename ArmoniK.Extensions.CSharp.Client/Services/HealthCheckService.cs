@@ -21,7 +21,7 @@ using System.Threading;
 using ArmoniK.Api.gRPC.V1.HealthChecks;
 using ArmoniK.Extensions.CSharp.Client.Common.Domain.Health;
 using ArmoniK.Extensions.CSharp.Client.Common.Services;
-using ArmoniK.Utils;
+using ArmoniK.Utils.Pool;
 
 using Grpc.Core;
 

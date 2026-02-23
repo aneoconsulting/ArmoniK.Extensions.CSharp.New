@@ -23,7 +23,7 @@ using ArmoniK.Api.gRPC.V1.Partitions;
 using ArmoniK.Api.gRPC.V1.SortDirection;
 using ArmoniK.Extensions.CSharp.Client.Common.Domain.Partition;
 using ArmoniK.Extensions.CSharp.Client.Common.Services;
-using ArmoniK.Utils;
+using ArmoniK.Utils.Pool;
 
 using Grpc.Core;
 
