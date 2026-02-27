@@ -28,29 +28,41 @@ namespace ArmoniK.Extensions.CSharp.Client.Queryable;
 ///   Converts LINQ expressions into filter and sort criteria for ArmoniK queries.
 /// </summary>
 /// <typeparam name="TSource">The source type being queried.</typeparam>
-/// <typeparam name="TEnumField">The enumeration type for field identifiers.</typeparam>
+/// <typeparam name="TField">The protobuf instance describing a field.</typeparam>
 /// <typeparam name="TFilterOr">The type representing OR filter operations.</typeparam>
 /// <typeparam name="TFilterAnd">The type representing AND filter operations.</typeparam>
 /// <typeparam name="TFilterField">The type representing individual field filters.</typeparam>
-internal abstract class QueryExpressionTreeVisitor<TSource, TEnumField, TFilterOr, TFilterAnd, TFilterField>
-  where TEnumField : new()
+internal abstract class QueryExpressionTreeVisitor<TSource, TField, TFilterOr, TFilterAnd, TFilterField>
+  where TField : new()
   where TFilterOr : new()
   where TFilterAnd : new()
 {
+  /// <summary>
+  ///   Not null when an extension method retuning TSource? has been applied
+  ///   on the IQueryable instance.
+  /// </summary>
   public Func<IAsyncEnumerable<TSource>, TSource?>? FuncReturnNullableTSource { get; private set; }
-  public Func<IAsyncEnumerable<TSource>, TSource>?  FuncReturnTSource         { get; private set; }
+
+  /// <summary>
+  ///   Not null when an extension method retuning TSource has been applied
+  ///   on the IQueryable instance.
+  /// </summary>
+  public Func<IAsyncEnumerable<TSource>, TSource>? FuncReturnTSource { get; private set; }
 
   public TFilterOr? Filters { get; private set; } = new();
 
-  public TEnumField SortCriteria { get; protected set; } = new();
+  /// <summary>
+  ///   The protobuf instance describing how to sort the results of the query.
+  /// </summary>
+  public TField SortCriteria { get; protected set; } = new();
 
   public bool IsSortAscending { get; protected set; }
 
   public int? PageSize { get; protected set; }
 
-  protected abstract bool                                                                        IsWhereExpressionTreeVisitorInstantiated { get; }
-  protected abstract WhereExpressionTreeVisitor<TEnumField, TFilterOr, TFilterAnd, TFilterField> WhereExpressionTreeVisitor               { get; }
-  protected abstract OrderByExpressionTreeVisitor<TEnumField>                                    OrderByWhereExpressionTreeVisitor        { get; }
+  protected abstract bool                                                                    IsWhereExpressionTreeVisitorInstantiated { get; }
+  protected abstract WhereExpressionTreeVisitor<TField, TFilterOr, TFilterAnd, TFilterField> WhereExpressionTreeVisitor               { get; }
+  protected abstract OrderByExpressionTreeVisitor<TField>                                    OrderByWhereExpressionTreeVisitor        { get; }
 
   /// <summary>
   ///   Visits and analyzes the provided expression tree.
@@ -65,6 +77,15 @@ internal abstract class QueryExpressionTreeVisitor<TSource, TEnumField, TFilterO
       Filters = WhereExpressionTreeVisitor.GetFilterOrRootNode();
     }
   }
+
+  /// <summary>
+  ///   Handle specific implementation of IQueryable extension methods.
+  /// </summary>
+  /// <param name="call">the call expression</param>
+  /// <returns>Whether the method call has been handled</returns>
+  protected virtual bool HandleMethodCallExpression(MethodCallExpression call)
+    // By default, no specific implementation of IQueryable extension method is handled.
+    => false;
 
   private void VisitTreeInternal(Expression tree)
   {
@@ -110,7 +131,7 @@ internal abstract class QueryExpressionTreeVisitor<TSource, TEnumField, TFilterO
           IsSortAscending = call.Method.Name == nameof(System.Linq.Queryable.OrderBy);
           SortCriteria    = OrderByWhereExpressionTreeVisitor.Visit(lambda);
         }
-        else
+        else if (!HandleMethodCallExpression(call))
         {
           // IQueryable<TResult> OfType<TResult>(this IQueryable source)
           // IQueryable<TResult> Cast<TResult>(this IQueryable source)

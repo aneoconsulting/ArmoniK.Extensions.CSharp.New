@@ -23,13 +23,16 @@ using ArmoniK.Extensions.CSharp.Client.Common.Domain.Blob;
 using ArmoniK.Extensions.CSharp.Client.Common.Enum;
 using ArmoniK.Extensions.CSharp.Client.Common.Generic;
 using ArmoniK.Extensions.CSharp.Client.Common.Services;
+using ArmoniK.Extensions.CSharp.Common.Common.Domain.Blob;
 
 using Microsoft.Extensions.Logging;
 
-namespace ArmoniK.Extensions.CSharp.Client.Queryable.BlobState;
+namespace ArmoniK.Extensions.CSharp.Client.Queryable.BlobStateQuery;
 
-internal class BlobStateQueryExecution : QueryExecution<BlobPage, CSharp.Common.Common.Domain.Blob.BlobState, ResultField, ResultRawEnumField, Filters, FiltersAnd,
-  FilterField>
+/// <summary>
+///   Specialisation of QueryExecution for queries on BlobState instances.
+/// </summary>
+internal class BlobStateQueryExecution : QueryExecution<BlobPage, BlobState, ResultField, Filters, FiltersAnd, FilterField>
 {
   private readonly IBlobService          blobService_;
   private readonly ILogger<IBlobService> logger_;
@@ -52,12 +55,11 @@ internal class BlobStateQueryExecution : QueryExecution<BlobPage, CSharp.Common.
                                          cancellationToken)
                          .ConfigureAwait(false);
 
-  protected override QueryExpressionTreeVisitor<CSharp.Common.Common.Domain.Blob.BlobState, ResultRawEnumField, Filters, FiltersAnd, FilterField>
-    CreateQueryExpressionTreeVisitor()
+  protected override QueryExpressionTreeVisitor<BlobState, ResultField, Filters, FiltersAnd, FilterField> CreateQueryExpressionTreeVisitor()
     => new BlobStateQueryExpressionTreeVisitor();
 
   protected override Pagination<Filters, ResultField> CreatePaginationInstance(
-    QueryExpressionTreeVisitor<CSharp.Common.Common.Domain.Blob.BlobState, ResultRawEnumField, Filters, FiltersAnd, FilterField> visitor)
+    QueryExpressionTreeVisitor<BlobState, ResultField, Filters, FiltersAnd, FilterField> visitor)
     => new BlobPagination
        {
          Filter = visitor.Filters!,
@@ -68,18 +70,13 @@ internal class BlobStateQueryExecution : QueryExecution<BlobPage, CSharp.Common.
          SortDirection = visitor.IsSortAscending
                            ? SortDirection.Asc
                            : SortDirection.Desc,
-         SortField = new ResultField
-                     {
-                       ResultRawField = new ResultRawField
-                                        {
-                                          Field = visitor.SortCriteria,
-                                        },
-                     },
+         SortField = visitor.SortCriteria,
        };
 
   protected override int GetTotalPageElements(BlobPage page)
     => page.TotalBlobCount;
 
-  protected override CSharp.Common.Common.Domain.Blob.BlobState[] GetPageElements(BlobPage page)
+  protected override object[] GetPageElements(Pagination<Filters, ResultField> pagination,
+                                              BlobPage                         page)
     => page.Blobs;
 }

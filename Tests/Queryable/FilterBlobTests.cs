@@ -18,7 +18,7 @@ using System.Data;
 
 using ArmoniK.Api.gRPC.V1.Results;
 using ArmoniK.Extensions.CSharp.Client.Queryable;
-using ArmoniK.Extensions.CSharp.Client.Queryable.BlobState;
+using ArmoniK.Extensions.CSharp.Client.Queryable.BlobStateQuery;
 using ArmoniK.Extensions.CSharp.Common.Common.Domain.Blob;
 using ArmoniK.Utils;
 
@@ -775,7 +775,7 @@ public class FilterBlobTests : BaseBlobFilterTests
   }
 
   [Test]
-  public async Task ContainsOnAsIListOfBlobIds()
+  public void ContainsOnAsIListOfBlobIds()
   {
     var client = new MockedArmoniKClient();
 
@@ -815,7 +815,7 @@ public class FilterBlobTests : BaseBlobFilterTests
   }
 
   [Test]
-  public async Task ContainsOnAsDictionaryKeyOfBlobIds()
+  public void ContainsOnAsDictionaryKeyOfBlobIds()
   {
     var client = new MockedArmoniKClient();
 

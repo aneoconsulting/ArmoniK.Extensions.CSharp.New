@@ -19,6 +19,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 
+using ArmoniK.Extensions.CSharp.Common.Common.Domain.Task;
+
+using TaskSummary = ArmoniK.Extensions.CSharp.Client.Common.Domain.Task.TaskSummary;
+
 namespace ArmoniK.Extensions.CSharp.Client.Queryable;
 
 /// <summary>
@@ -59,5 +63,25 @@ public static class QueryableExt
                                                           new Func<IQueryable<T>, int, IQueryable<T>>(WithPageSize).Method,
                                                           source.Expression,
                                                           Expression.Constant(pageSize)));
+  }
+
+  /// <summary>
+  ///   Converts a request on TaskSummary instances to an asynchronous enumeration of TaskState.
+  /// </summary>
+  /// <param name="source">The queryable instance</param>
+  /// <returns>An asynchronous enumeration of task summaries</returns>
+  /// <exception cref="ArgumentNullException">When source is null</exception>
+  public static IAsyncEnumerable<TaskState> AsTaskDetailed(this IQueryable<TaskSummary> source)
+  {
+    if (source == null)
+    {
+      throw new ArgumentNullException(nameof(source));
+    }
+
+    var collection = (IAsyncEnumerable<object>)source.Provider.Execute(Expression.Call(null,
+                                                                                       new Func<IQueryable<TaskSummary>, IAsyncEnumerable<TaskState>>(AsTaskDetailed)
+                                                                                         .Method,
+                                                                                       source.Expression));
+    return collection.Cast<TaskState>();
   }
 }

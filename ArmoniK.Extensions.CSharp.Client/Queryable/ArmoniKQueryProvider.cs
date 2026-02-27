@@ -20,9 +20,6 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Threading;
 
-using ArmoniK.Extensions.CSharp.Client.Common.Services;
-using ArmoniK.Utils;
-
 using Microsoft.Extensions.Logging;
 
 namespace ArmoniK.Extensions.CSharp.Client.Queryable;
@@ -30,22 +27,28 @@ namespace ArmoniK.Extensions.CSharp.Client.Queryable;
 /// <summary>
 ///   Class query provider that build the protobuf filtering structure
 /// </summary>
-internal abstract class ArmoniKQueryProvider<TPage, TSource, TField, TEnumField, TFilterOr, TFilterAnd, TFilterField> : IAsyncQueryProvider<TSource>
+/// <typeparam name="TService">The service type that actually executes the query</typeparam>
+/// <typeparam name="TPage">The type of page of elements returned by the query.</typeparam>
+/// <typeparam name="TSource">The type of the requested instances.</typeparam>
+/// <typeparam name="TField">The type of the paginated instances.</typeparam>
+/// <typeparam name="TFilterOr">The type of the protobuf instance that represents a logical OR node.</typeparam>
+/// <typeparam name="TFilterAnd">The type of the protobuf instance that represents a logical AND node.</typeparam>
+/// <typeparam name="TFilterField">The type of the protobuf instance that describe a filter on a single property.</typeparam>
+internal abstract class ArmoniKQueryProvider<TService, TPage, TSource, TField, TFilterOr, TFilterAnd, TFilterField> : IAsyncQueryProvider<TSource>
   where TField : new()
-  where TEnumField : new()
   where TFilterOr : new()
   where TFilterAnd : new()
 {
-  protected readonly ILogger<IBlobService> Logger;
+  protected readonly ILogger<TService> Logger;
 
   /// <summary>
   ///   Create the query provider
   /// </summary>
   /// <param name="logger">The logger</param>
-  protected ArmoniKQueryProvider(ILogger<IBlobService> logger)
+  protected ArmoniKQueryProvider(ILogger<TService> logger)
     => Logger = logger;
 
-  public QueryExecution<TPage, TSource, TField, TEnumField, TFilterOr, TFilterAnd, TFilterField>? QueryExecution { get; private set; }
+  public QueryExecution<TPage, TSource, TField, TFilterOr, TFilterAnd, TFilterField>? QueryExecution { get; private set; }
 
   /// <summary>
   ///   Create the query object
@@ -78,17 +81,17 @@ internal abstract class ArmoniKQueryProvider<TPage, TSource, TField, TEnumField,
     QueryExecution.VisitExpression(expression);
     if (QueryExecution.FuncReturnTSource != null)
     {
-      return QueryExecution.FuncReturnTSource(QueryExecution.ExecuteAsync());
+      return QueryExecution.FuncReturnTSource(QueryExecution.ExecuteAsync()
+                                                            .Cast<TSource>());
     }
 
     if (QueryExecution.FuncReturnNullableTSource != null)
     {
-      return QueryExecution.FuncReturnNullableTSource(QueryExecution.ExecuteAsync());
+      return QueryExecution.FuncReturnNullableTSource(QueryExecution.ExecuteAsync()
+                                                                    .Cast<TSource>());
     }
 
-    return QueryExecution.ExecuteAsync()
-                         .ToListAsync()
-                         .WaitSync();
+    return QueryExecution.ExecuteAsync();
   }
 
   /// <summary>
@@ -114,8 +117,9 @@ internal abstract class ArmoniKQueryProvider<TPage, TSource, TField, TEnumField,
   {
     QueryExecution = CreateQueryExecution();
     QueryExecution.VisitExpression(expression);
-    return QueryExecution.ExecuteAsync(cancellationToken);
+    return QueryExecution.ExecuteAsync(cancellationToken)
+                         .Cast<TSource>();
   }
 
-  protected abstract QueryExecution<TPage, TSource, TField, TEnumField, TFilterOr, TFilterAnd, TFilterField> CreateQueryExecution();
+  protected abstract QueryExecution<TPage, TSource, TField, TFilterOr, TFilterAnd, TFilterField> CreateQueryExecution();
 }

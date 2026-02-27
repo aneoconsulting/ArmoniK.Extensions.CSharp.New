@@ -49,6 +49,11 @@ public record TaskInfos
   ///   Session ID associated with the task.
   /// </summary>
   public string SessionId { get; init; } = string.Empty;
+
+  /// <summary>
+  ///   Gets the configuration options for the task, which may be null if no additional configurations are specified.
+  /// </summary>
+  public TaskConfiguration TaskOptions { get; set; } = new();
 }
 
 /// <summary>
