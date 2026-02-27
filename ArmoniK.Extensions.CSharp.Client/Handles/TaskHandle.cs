@@ -139,7 +139,7 @@ public class TaskHandle
   {
     var taskInfos = await GetTaskInfosAsync()
                       .ConfigureAwait(false);
-    return await ArmoniKClient.TasksService.GetTasksDetailedAsync(taskInfos.TaskId,
+    return await ArmoniKClient.TasksService.GetTasksDetailedAsync(taskInfos,
                                                                   cancellationToken)
                               .ConfigureAwait(false);
   }
