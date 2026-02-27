@@ -598,14 +598,14 @@ public class FilterTaskTests : BaseTaskFilterTests
     var client = new MockedArmoniKClient();
 
     var filter = BuildOr(BuildAnd(BuildFilterInt("MaxRetries",
-                                                    "==",
-                                                    2)),
+                                                 "==",
+                                                 2)),
                          BuildAnd(BuildFilterInt("MaxRetries",
-                                                    "==",
-                                                    3)),
+                                                 "==",
+                                                 3)),
                          BuildAnd(BuildFilterInt("MaxRetries",
-                                                    "==",
-                                                    4)));
+                                                 "==",
+                                                 4)));
 
     int[] maxRetries = [2, 3, 4];
     var query = client.TasksService.AsQueryable()
