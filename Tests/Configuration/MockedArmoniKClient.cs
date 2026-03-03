@@ -119,6 +119,7 @@ internal sealed class MockedArmoniKClient
 
   private IEventsService BuildEventsService(IServiceProvider provider)
     => new EventsService(ChannelPool,
+                         this,
                          LoggerFactory);
 
   private IHealthCheckService BuildHealthCheckService(IServiceProvider provider)

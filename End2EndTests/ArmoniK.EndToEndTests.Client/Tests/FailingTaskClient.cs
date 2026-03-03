@@ -16,6 +16,7 @@
 
 using ArmoniK.Extensions.CSharp.Client.Common.Domain.Blob;
 using ArmoniK.Extensions.CSharp.Client.Common.Domain.Task;
+using ArmoniK.Extensions.CSharp.Client.Exceptions;
 using ArmoniK.Extensions.CSharp.Client.Handles;
 
 namespace ArmoniK.EndToEndTests.Client.Tests;
@@ -51,6 +52,44 @@ internal class FailingTaskClient : ClientBase
 
     Assert.That(callback.Aborted,
                 Is.EqualTo(true));
+  }
+
+  [Test]
+  public async Task AbortedTaskWithEventApi()
+  {
+    var callback = new Callback(SessionHandle!);
+
+    var taskDefinition = new TaskDefinition().WithLibrary(WorkerLibrary!)
+                                             .WithInput("inputString",
+                                                        BlobDefinition.FromString("blobInputString",
+                                                                                  "Hello world!"))
+                                             .WithOutput("outputString",
+                                                         BlobDefinition.CreateOutput("blobOutputString"))
+                                             .WithTaskOptions(TaskConfiguration!);
+
+    await Client!.TasksService.SubmitTasksAsync(SessionHandle!,
+                                                [taskDefinition],
+                                                CancellationToken.None)
+                 .ToListAsync()
+                 .ConfigureAwait(false);
+
+    var outputBlob = taskDefinition.Outputs["outputString"].BlobHandle!.BlobInfo;
+    var taskFailedException = Assert.ThrowsAsync<TaskFailedException>(async () => await Client!.EventsService.WaitForBlobsAsync(SessionHandle!,
+                                                                                                                                [outputBlob],
+                                                                                                                                CancellationToken.None)
+                                                                                               .ConfigureAwait(false));
+
+    Assert.Multiple(() =>
+                    {
+                      Assert.That(taskFailedException,
+                                  Is.Not.Null);
+                      Assert.That(taskFailedException!.AbortedBlobs,
+                                  Has.Length.EqualTo(1));
+                      Assert.That(taskFailedException!.CompletedBlobs,
+                                  Is.Empty);
+                      Assert.That(taskFailedException.AbortedBlobs[0].BlobId,
+                                  Is.EqualTo(outputBlob.BlobId));
+                    });
   }
 
   private class Callback : ICallback
