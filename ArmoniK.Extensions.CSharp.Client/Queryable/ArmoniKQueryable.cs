@@ -76,7 +76,26 @@ internal class ArmoniKQueryable<TSource> : IOrderedQueryable<TSource>, IAsyncEnu
 
   /// <inheritdoc />
   public IEnumerator<TSource> GetEnumerator()
-    => ((IEnumerable<TSource>)Provider.Execute(Expression)).GetEnumerator();
+  {
+    var result = Provider.Execute(Expression);
+    if (result is IAsyncEnumerable<object> asyncEnumerable)
+    {
+      return asyncEnumerable.Cast<TSource>()
+                            .ToEnumerable()
+                            .GetEnumerator();
+    }
+
+    if (result is TSource scalar)
+    {
+      var array = new List<TSource>
+                  {
+                    scalar,
+                  };
+      return array.GetEnumerator();
+    }
+
+    throw new InvalidOperationException($"The query returned an unexpected instance type: {result.GetType()}");
+  }
 
   IEnumerator IEnumerable.GetEnumerator()
     => GetEnumerator();

@@ -14,9 +14,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-using System;
-using System.Collections.Generic;
-
 using ArmoniK.Api.gRPC.V1.Tasks;
 using ArmoniK.Extensions.CSharp.Client.Common.Generic;
 using ArmoniK.Extensions.CSharp.Common.Common.Domain.Task;
@@ -26,8 +23,13 @@ namespace ArmoniK.Extensions.CSharp.Client.Common.Domain.Task;
 /// <summary>
 ///   Represents pagination details for tasks, allowing for sorted and filtered lists of tasks.
 /// </summary>
-public record TaskPagination : Pagination<Filters, TaskOptionEnumField>
+public record TaskPagination : Pagination<Filters, TaskField>
 {
+  /// <summary>
+  ///   When set to true, the returned pages will value TaskDetails property and let TasksSummaries null.
+  ///   Otherwise, TasksSummaries will be filled with the task status and TaskDetails will be null.
+  /// </summary>
+  public bool UseDetailedVersion { get; init; }
 }
 
 /// <summary>
@@ -41,25 +43,12 @@ public record TaskPage
   public int TotalTasks { get; init; }
 
   /// <summary>
-  ///   List of tuples of unique identifier of the task and its current status.
+  ///   Summary state information of the task.
   /// </summary>
-  public IEnumerable<Tuple<string, TaskStatus>> TasksData { get; init; } = [];
-}
-
-/// <summary>
-///   Represents a detailed page within a paginated list of tasks, containing extensive information about a specific
-///   task.
-/// </summary>
-public record TaskDetailedPage
-{
-  /// <summary>
-  ///   Total number of pages available in the paginated list.
-  /// </summary>
-  public int TotalTasks { get; init; }
+  public TaskSummary[]? TasksSummaries { get; init; }
 
   /// <summary>
   ///   Detailed state information of the task.
   /// </summary>
-
-  public IEnumerable<TaskState> TaskDetails { get; init; } = [];
+  public TaskState[]? TaskDetails { get; init; }
 }

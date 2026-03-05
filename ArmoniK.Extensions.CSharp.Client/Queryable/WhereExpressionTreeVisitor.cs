@@ -15,25 +15,42 @@
 // limitations under the License.
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 
+using ArmoniK.Api.gRPC.V1;
 using ArmoniK.Extensions.CSharp.Common.Common.Domain.Blob;
+using ArmoniK.Extensions.CSharp.Common.Common.Domain.Task;
 
 using Google.Protobuf.Collections;
+using Google.Protobuf.WellKnownTypes;
+
+using TaskStatus = ArmoniK.Extensions.CSharp.Common.Common.Domain.Task.TaskStatus;
+using Type = System.Type;
 
 namespace ArmoniK.Extensions.CSharp.Client.Queryable;
 
-internal abstract class WhereExpressionTreeVisitor<TEnumField, TFilterOr, TFilterAnd, TFilterField>
+/// <summary>
+///   Visitor class of a lambda describing a filter.
+/// </summary>
+/// <typeparam name="TField">The protobuf instance describing a field.</typeparam>
+/// <typeparam name="TFilterOr">The type of logical OR nodes.</typeparam>
+/// <typeparam name="TFilterAnd">The type of logical AND nodes.</typeparam>
+/// <typeparam name="TFilterField">The type of instance node describing a filter on a single property.</typeparam>
+internal abstract class WhereExpressionTreeVisitor<TField, TFilterOr, TFilterAnd, TFilterField>
   where TFilterOr : new()
   where TFilterAnd : new()
 {
-  protected readonly Stack<Type>   ExpressionTypeStack = new();
-  protected readonly Stack<object> FilterStack         = new();
+  protected readonly Stack<(object, Type)> FilterStack = new();
 
+  /// <summary>
+  ///   Visit the lambda Expression Tree describing the filter.
+  /// </summary>
+  /// <param name="lambda">the lambda Expression Tree.</param>
   public void Visit(LambdaExpression lambda)
   {
     Visit(lambda.Body);
@@ -45,14 +62,14 @@ internal abstract class WhereExpressionTreeVisitor<TEnumField, TFilterOr, TFilte
     }
     else if (FilterStack.Count == 1)
     {
-      var obj = FilterStack.Pop();
+      var (obj, _) = FilterStack.Pop();
       if (obj is bool result)
       {
-        FilterStack.Push(result);
+        FilterStack.Push((result, typeof(bool)));
       }
       else
       {
-        FilterStack.Push(CreateFilterFromStack(obj)!);
+        FilterStack.Push((CreateFilterFromStack(obj)!, typeof(bool)));
       }
     }
     else
@@ -61,6 +78,14 @@ internal abstract class WhereExpressionTreeVisitor<TEnumField, TFilterOr, TFilte
     }
   }
 
+  /// <summary>
+  ///   Get the resulting tree from the analysis stack.
+  /// </summary>
+  /// <returns>The root node of the tree.</returns>
+  /// <exception cref="InvalidOperationException">
+  ///   When the analysis stack is in an inconsistent state,
+  ///   which results from an invalid Expression Tree filter.
+  /// </exception>
   public TFilterOr? GetFilterOrRootNode()
   {
     var filters = FilterStack.Pop();
@@ -69,7 +94,7 @@ internal abstract class WhereExpressionTreeVisitor<TEnumField, TFilterOr, TFilte
       throw new InvalidOperationException("Internal error: analysis stack is in an inconsistent state");
     }
 
-    if (filters is bool boolValue)
+    if (filters.Item1 is bool boolValue)
     {
       if (boolValue)
       {
@@ -81,7 +106,7 @@ internal abstract class WhereExpressionTreeVisitor<TEnumField, TFilterOr, TFilte
       return default;
     }
 
-    return (TFilterOr)filters;
+    return (TFilterOr)filters.Item1;
   }
 
   private TFilterOr CreateFilterFromStack(object filter)
@@ -113,9 +138,9 @@ internal abstract class WhereExpressionTreeVisitor<TEnumField, TFilterOr, TFilte
   {
     if (node is MethodCallExpression call)
     {
-      var memberAccess = call.Object as MemberExpression;
-      var typeName     = call.Method.DeclaringType?.FullName ?? "";
-      if (call.Method.Name == nameof(string.StartsWith) && typeName == "System.String" && memberAccess?.Expression.NodeType == ExpressionType.Parameter)
+      var hasParameterQualifier = call.Object!.IsLeftMostQualifierAParameter();
+      var typeName              = call.Method.DeclaringType?.FullName ?? "";
+      if (call.Method.Name == nameof(string.StartsWith) && typeName == "System.String" && hasParameterQualifier)
       {
         if (call.Arguments.Count != 1)
         {
@@ -128,7 +153,7 @@ internal abstract class WhereExpressionTreeVisitor<TEnumField, TFilterOr, TFilte
         return;
       }
 
-      if (call.Method.Name == nameof(string.EndsWith) && typeName == "System.String" && memberAccess?.Expression.NodeType == ExpressionType.Parameter)
+      if (call.Method.Name == nameof(string.EndsWith) && typeName == "System.String" && hasParameterQualifier)
       {
         if (call.Arguments.Count != 1)
         {
@@ -143,7 +168,7 @@ internal abstract class WhereExpressionTreeVisitor<TEnumField, TFilterOr, TFilte
 
       if (call.Method.Name == nameof(string.Contains))
       {
-        if (typeName == "System.String" && memberAccess?.Expression.NodeType == ExpressionType.Parameter)
+        if (typeName == "System.String" && hasParameterQualifier)
         {
           if (call.Arguments.Count != 1)
           {
@@ -167,7 +192,12 @@ internal abstract class WhereExpressionTreeVisitor<TEnumField, TFilterOr, TFilte
                                 .FirstOrDefault();
           if (ienumerable != null)
           {
-            EvaluateExpression(call.Object);
+            var val = call.Object.EvaluateExpression();
+            if (val != null)
+            {
+              FilterStack.Push((val, val.GetType()));
+            }
+
             Visit(call.Arguments[0]);
 
             VisitContainsMethod(call,
@@ -191,8 +221,29 @@ internal abstract class WhereExpressionTreeVisitor<TEnumField, TFilterOr, TFilte
         }
       }
 
+      if (call.Method.Name == "get_Item")
+      {
+        Visit(call.Object!);
+        Visit(call.Arguments[0]);
+        OnIndexerAccess();
+        return;
+      }
+
       // Evaluate the method
-      EvaluateExpression(call);
+      var result = call.EvaluateExpression();
+      if (result != null)
+      {
+        FilterStack.Push((result, result.GetType()));
+      }
+    }
+    else if (node is InvocationExpression invoke)
+    {
+      // Invocation of a delegate or lambda, let's evaluate it
+      var result = invoke.EvaluateExpression();
+      if (result != null)
+      {
+        FilterStack.Push((result, result.GetType()));
+      }
     }
     else if (node is ConstantExpression constant)
     {
@@ -220,7 +271,11 @@ internal abstract class WhereExpressionTreeVisitor<TEnumField, TFilterOr, TFilte
       }
       else
       {
-        EvaluateExpression(binary);
+        var result = binary.EvaluateExpression();
+        if (result != null)
+        {
+          FilterStack.Push((result, result.GetType()));
+        }
       }
     }
     else if (node is UnaryExpression unary)
@@ -228,8 +283,6 @@ internal abstract class WhereExpressionTreeVisitor<TEnumField, TFilterOr, TFilte
       if (unary.NodeType == ExpressionType.Convert)
       {
         Visit(unary.Operand);
-        ExpressionTypeStack.Pop();
-        ExpressionTypeStack.Push(unary.Operand.Type);
       }
       else if (unary.NodeType == ExpressionType.Not && ExpressionContainsLambdaParameter(unary.Operand))
       {
@@ -238,107 +291,30 @@ internal abstract class WhereExpressionTreeVisitor<TEnumField, TFilterOr, TFilte
       }
       else
       {
-        EvaluateExpression(unary);
+        var result = unary.EvaluateExpression();
+        if (result != null)
+        {
+          FilterStack.Push((result, result.GetType()));
+        }
       }
     }
   }
 
-  private void VisitContainsMethod(MethodCallExpression call,
-                                   bool                 notOp)
-  {
-    var containsParam = FilterStack.Peek();
-    if (containsParam is TEnumField enumField)
-    {
-      // filter of the form : collection.Contains(enumField)
-      FilterStack.Pop();
-      var collection = FilterStack.Pop();
-
-      ExpressionTypeStack.Pop(); // type of the enum field
-      ExpressionTypeStack.Pop(); // type of the collection
-      OnCollectionContains(enumField,
-                           collection,
-                           notOp);
-    }
-    else
-    {
-      throw new InvalidOperationException("Invalid filter: illegal use of method Contains");
-    }
-  }
-
-  private void EvaluateExpression(Expression expr)
-  {
-    Expression<Func<object>>? lambda = null;
-    try
-    {
-      var objectExpr = Expression.Convert(expr,
-                                          typeof(object));
-      lambda = Expression.Lambda<Func<object>>(objectExpr);
-      var result = lambda.Compile()();
-      ExpressionTypeStack.Push(result.GetType());
-      FilterStack.Push(result);
-    }
-    catch (Exception ex)
-    {
-      throw new InvalidExpressionException("Invalid filter: could not evaluate method call " + lambda,
-                                           ex);
-    }
-  }
-
-  private static object? GetValueFromExpression(Expression expression)
-  {
-    switch (expression)
-    {
-      case MemberExpression memberExpr:
-        object? instance = null;
-
-        if (memberExpr.Expression is ConstantExpression constant)
-        {
-          instance = constant.Value;
-        }
-        else if (memberExpr.Expression != null)
-        {
-          instance = GetValueFromExpression(memberExpr.Expression);
-          if (instance == null)
-          {
-            return null;
-          }
-        }
-
-        if (memberExpr.Member is PropertyInfo propInfo)
-        {
-          return propInfo.GetValue(instance);
-        }
-
-        if (memberExpr.Member is FieldInfo fieldInfo)
-        {
-          return fieldInfo.GetValue(instance);
-        }
-
-        break;
-
-      case ConstantExpression constExpr:
-        return constExpr.Value;
-    }
-
-    return null;
-  }
-
   private void OnPropertyMemberAccess(MemberExpression member)
   {
-    var val = GetValueFromExpression(member);
-    if (val != null)
+    if (member.IsLeftMostQualifierAParameter())
     {
-      ExpressionTypeStack.Push(val.GetType());
-      FilterStack.Push(val);
+      if (!PushProperty(member))
+      {
+        throw new InvalidOperationException("Unsupported filter expression on member " + member.Member.Name);
+      }
     }
     else
     {
-      if (TryGetFieldTypeFromName(member.Member.Name,
-                                  out var memberType) && TryGetEnumFieldFromName(member.Member.Name,
-                                                                                 out var enumField))
+      var val = member.GetValueFromExpression();
+      if (val != null)
       {
-        ExpressionTypeStack.Push(memberType);
-        FilterStack.Push(enumField!);
+        FilterStack.Push((val, val.GetType()));
       }
       else
       {
@@ -348,18 +324,14 @@ internal abstract class WhereExpressionTreeVisitor<TEnumField, TFilterOr, TFilte
   }
 
   private void OnConstant(ConstantExpression constant)
-  {
-    ExpressionTypeStack.Push(constant.Type);
-    FilterStack.Push(constant.Value);
-  }
+    => FilterStack.Push((constant.Value, constant.Type));
 
   private bool OnFieldAccess(MemberExpression member)
   {
-    var val = GetValueFromExpression(member);
+    var val = member.GetValueFromExpression();
     if (val != null)
     {
-      ExpressionTypeStack.Push(val.GetType());
-      FilterStack.Push(val);
+      FilterStack.Push((val, val.GetType()));
       return true;
     }
 
@@ -368,9 +340,12 @@ internal abstract class WhereExpressionTreeVisitor<TEnumField, TFilterOr, TFilte
 
   private void OnBinaryOperator(ExpressionType expressionType)
   {
-    var rhsType = ExpressionTypeStack.Pop();
-    var lhsType = ExpressionTypeStack.Pop();
-
+    var rhs     = FilterStack.Pop();
+    var lhs     = FilterStack.Pop();
+    var rhsType = rhs.Item2;
+    var lhsType = lhs.Item2;
+    FilterStack.Push(lhs);
+    FilterStack.Push(rhs);
     if (rhsType == typeof(bool))
     {
       HandleBoolExpression(expressionType);
@@ -383,6 +358,10 @@ internal abstract class WhereExpressionTreeVisitor<TEnumField, TFilterOr, TFilte
     {
       HandleBlobStatusExpression(expressionType);
     }
+    else if (rhsType == typeof(TaskStatus) || lhsType == typeof(TaskStatus))
+    {
+      HandleTaskStatusExpression(expressionType);
+    }
     else if (rhsType == typeof(int))
     {
       HandleIntegerExpression(expressionType);
@@ -391,12 +370,14 @@ internal abstract class WhereExpressionTreeVisitor<TEnumField, TFilterOr, TFilte
     {
       HandleDateTimeExpression(expressionType);
     }
+    else if (rhsType == typeof(TimeSpan))
+    {
+      HandleTimeSpanExpression(expressionType);
+    }
     else
     {
       throw new InvalidOperationException("Invalid filter: Operands of expression type {rhsType.Name} are not supported.");
     }
-
-    ExpressionTypeStack.Push(typeof(bool));
   }
 
   private static Expression GetLeftMostExpression(BinaryExpression binaryExpression)
@@ -471,8 +452,8 @@ internal abstract class WhereExpressionTreeVisitor<TEnumField, TFilterOr, TFilte
 
   private void HandleBoolExpression(ExpressionType type)
   {
-    var rhsFilter = FilterStack.Pop();
-    var lhsFilter = FilterStack.Pop();
+    var (rhsFilter, _) = FilterStack.Pop();
+    var (lhsFilter, _) = FilterStack.Pop();
     switch (type)
     {
       case ExpressionType.OrElse:
@@ -487,14 +468,14 @@ internal abstract class WhereExpressionTreeVisitor<TEnumField, TFilterOr, TFilte
                 .Add(rhsAndFilter);
             }
 
-            FilterStack.Push(lhsOrFilter);
+            FilterStack.Push((lhsOrFilter, typeof(bool)));
           }
           else if (rhsFilter is TFilterAnd rhsAndFilter)
           {
             // <or expression> || <and expression>
             GetRepeatedFilterAnd(lhsOrFilter)
               .Add(rhsAndFilter);
-            FilterStack.Push(lhsOrFilter);
+            FilterStack.Push((lhsOrFilter, typeof(bool)));
           }
           else if (rhsFilter is TFilterField rhsFilterField)
           {
@@ -502,18 +483,18 @@ internal abstract class WhereExpressionTreeVisitor<TEnumField, TFilterOr, TFilte
             var andFilter = CreateFilterAnd(rhsFilterField);
             GetRepeatedFilterAnd(lhsOrFilter)
               .Add(andFilter);
-            FilterStack.Push(lhsOrFilter);
+            FilterStack.Push((lhsOrFilter, typeof(bool)));
           }
           else if (rhsFilter is bool rhsValue)
           {
             // <or expression> || <bool>
             if (rhsValue)
             {
-              FilterStack.Push(true);
+              FilterStack.Push((true, typeof(bool)));
             }
             else
             {
-              FilterStack.Push(lhsOrFilter);
+              FilterStack.Push((lhsOrFilter, typeof(bool)));
             }
           }
           else
@@ -533,14 +514,14 @@ internal abstract class WhereExpressionTreeVisitor<TEnumField, TFilterOr, TFilte
                 .Add(rhsAndFilter);
             }
 
-            FilterStack.Push(orFilter!);
+            FilterStack.Push((orFilter!, typeof(bool)));
           }
           else if (rhsFilter is TFilterAnd rhsAndFilter)
           {
             // <and expression> || <and expression>
             var orFilter = CreateFilterOr(lhsAndFilter,
                                           rhsAndFilter);
-            FilterStack.Push(orFilter!);
+            FilterStack.Push((orFilter!, typeof(bool)));
           }
           else if (rhsFilter is TFilterField rhsFilterField)
           {
@@ -548,18 +529,18 @@ internal abstract class WhereExpressionTreeVisitor<TEnumField, TFilterOr, TFilte
             var andRhsFilter = CreateFilterAnd(rhsFilterField);
             var orFilter = CreateFilterOr(lhsAndFilter,
                                           andRhsFilter);
-            FilterStack.Push(orFilter!);
+            FilterStack.Push((orFilter!, typeof(bool)));
           }
           else if (rhsFilter is bool rhsValue)
           {
             // <and expression> || <bool>
             if (rhsValue)
             {
-              FilterStack.Push(true);
+              FilterStack.Push((true, typeof(bool)));
             }
             else
             {
-              FilterStack.Push(lhsAndFilter);
+              FilterStack.Push((lhsAndFilter, typeof(bool)));
             }
           }
           else
@@ -580,32 +561,32 @@ internal abstract class WhereExpressionTreeVisitor<TEnumField, TFilterOr, TFilte
                 .Add(rhsAndFilter);
             }
 
-            FilterStack.Push(orFilter!);
+            FilterStack.Push((orFilter!, typeof(bool)));
           }
           else if (rhsFilter is TFilterAnd rhsAndFilter)
           {
             // <filter field> || <and expression>
             var orFilter = CreateFilterOr(CreateFilterAnd(lhsFilterField),
                                           rhsAndFilter);
-            FilterStack.Push(orFilter!);
+            FilterStack.Push((orFilter!, typeof(bool)));
           }
           else if (rhsFilter is TFilterField rhsFilterField)
           {
             // <filter field> || <filter field>
             var orFilter = CreateFilterOr(CreateFilterAnd(lhsFilterField),
                                           CreateFilterAnd(rhsFilterField));
-            FilterStack.Push(orFilter!);
+            FilterStack.Push((orFilter!, typeof(bool)));
           }
           else if (rhsFilter is bool rhsValue)
           {
             // <filter field> || <bool>
             if (rhsValue)
             {
-              FilterStack.Push(true);
+              FilterStack.Push((true, typeof(bool)));
             }
             else
             {
-              FilterStack.Push(lhsFilterField);
+              FilterStack.Push((lhsFilterField, typeof(bool)));
             }
           }
           else
@@ -616,9 +597,9 @@ internal abstract class WhereExpressionTreeVisitor<TEnumField, TFilterOr, TFilte
         else if (lhsFilter is bool lhsValue)
         {
           // <bool> || <any>
-          FilterStack.Push(lhsValue
-                             ? true
-                             : rhsFilter);
+          FilterStack.Push((lhsValue
+                              ? true
+                              : rhsFilter, typeof(bool)));
         }
 
         break;
@@ -643,7 +624,7 @@ internal abstract class WhereExpressionTreeVisitor<TEnumField, TFilterOr, TFilte
               }
             }
 
-            FilterStack.Push(orFilter);
+            FilterStack.Push((orFilter, typeof(bool)));
           }
           else if (rhsFilter is TFilterAnd rhsAndFilter)
           {
@@ -664,7 +645,7 @@ internal abstract class WhereExpressionTreeVisitor<TEnumField, TFilterOr, TFilte
                 .Add(andFilter);
             }
 
-            FilterStack.Push(orFilter);
+            FilterStack.Push((orFilter, typeof(bool)));
           }
           else if (rhsFilter is TFilterField rhsFilterField)
           {
@@ -675,18 +656,18 @@ internal abstract class WhereExpressionTreeVisitor<TEnumField, TFilterOr, TFilte
                 .Add(rhsFilterField);
             }
 
-            FilterStack.Push(lhsOrFilter2);
+            FilterStack.Push((lhsOrFilter2, typeof(bool)));
           }
           else if (rhsFilter is bool rhsValue)
           {
             // <or expression> && <bool>
             if (rhsValue)
             {
-              FilterStack.Push(lhsOrFilter2);
+              FilterStack.Push((lhsOrFilter2, typeof(bool)));
             }
             else
             {
-              FilterStack.Push(false);
+              FilterStack.Push((false, typeof(bool)));
             }
           }
           else
@@ -711,7 +692,7 @@ internal abstract class WhereExpressionTreeVisitor<TEnumField, TFilterOr, TFilte
                 .Add(andFilter);
             }
 
-            FilterStack.Push(orFilter);
+            FilterStack.Push((orFilter, typeof(bool)));
           }
           else if (rhsFilter is TFilterAnd rhsAndFilter)
           {
@@ -722,25 +703,25 @@ internal abstract class WhereExpressionTreeVisitor<TEnumField, TFilterOr, TFilte
                 .Add(rhsFilterField);
             }
 
-            FilterStack.Push(lhsAndFilter);
+            FilterStack.Push((lhsAndFilter, typeof(bool)));
           }
           else if (rhsFilter is TFilterField rhsFilterField)
           {
             // <and expression> && <filter field>
             GetRepeatedFilterField(lhsAndFilter)
               .Add(rhsFilterField);
-            FilterStack.Push(lhsAndFilter);
+            FilterStack.Push((lhsAndFilter, typeof(bool)));
           }
           else if (rhsFilter is bool rhsValue)
           {
             // <and expression> && <bool>
             if (rhsValue)
             {
-              FilterStack.Push(lhsAndFilter);
+              FilterStack.Push((lhsAndFilter, typeof(bool)));
             }
             else
             {
-              FilterStack.Push(false);
+              FilterStack.Push((false, typeof(bool)));
             }
           }
           else
@@ -755,18 +736,18 @@ internal abstract class WhereExpressionTreeVisitor<TEnumField, TFilterOr, TFilte
             // <filter field> && <filter field>
             var andFilter = CreateFilterAnd(lhsFilterField,
                                             rhsFilterField);
-            FilterStack.Push(andFilter!);
+            FilterStack.Push((andFilter!, typeof(bool)));
           }
           else if (rhsFilter is bool rhsValue)
           {
             // <filter field> && <bool>
             if (rhsValue)
             {
-              FilterStack.Push(lhsFilterField);
+              FilterStack.Push((lhsFilterField, typeof(bool)));
             }
             else
             {
-              FilterStack.Push(false);
+              FilterStack.Push((false, typeof(bool)));
             }
           }
           else
@@ -777,9 +758,9 @@ internal abstract class WhereExpressionTreeVisitor<TEnumField, TFilterOr, TFilte
         else if (lhsFilter is bool lhsValue)
         {
           // <bool> && <any>
-          FilterStack.Push(lhsValue
-                             ? rhsFilter
-                             : false);
+          FilterStack.Push((lhsValue
+                              ? rhsFilter
+                              : false, typeof(bool)));
         }
 
         break;
@@ -788,21 +769,546 @@ internal abstract class WhereExpressionTreeVisitor<TEnumField, TFilterOr, TFilte
     }
   }
 
-  protected abstract void HandleStringExpression(ExpressionType     type);
-  protected abstract void HandleIntegerExpression(ExpressionType    type);
-  protected abstract void HandleDateTimeExpression(ExpressionType   type);
-  protected abstract void HandleBlobStatusExpression(ExpressionType type);
 
-  protected abstract void OnStringMethodOperator(MethodInfo method,
-                                                 bool       notOp = false);
+  private void VisitContainsMethod(MethodCallExpression call,
+                                   bool                 notOp)
+  {
+    var (containsParam, _) = FilterStack.Peek();
+    if (containsParam is TField field)
+    {
+      // filter of the form : collection.Contains(field)
+      FilterStack.Pop();                       // Pop the enum field
+      var (collection, _) = FilterStack.Pop(); // Pop the collection
 
-  protected abstract void OnCollectionContains(TEnumField enumField,
-                                               object     collection,
-                                               bool       notOp = false);
+      OnCollectionContains(field,
+                           ((IEnumerable)collection).Cast<object>(),
+                           notOp);
+    }
+    else
+    {
+      throw new InvalidOperationException("Invalid filter: illegal use of method Contains");
+    }
+  }
 
-  protected abstract bool TryGetEnumFieldFromName(string         name,
-                                                  out TEnumField enumField);
+  protected abstract void OnCollectionContains(TField              taskField,
+                                               IEnumerable<object> collection,
+                                               bool                notOp = false);
 
-  protected abstract bool TryGetFieldTypeFromName(string   name,
-                                                  out Type type);
+  protected TFilterField CreateFilterField(TField taskField,
+                                           object val,
+                                           bool   isEqual)
+    => val switch
+       {
+         int number => CreateNumberFilter(taskField,
+                                          isEqual
+                                            ? FilterNumberOperator.Equal
+                                            : FilterNumberOperator.NotEqual,
+                                          number),
+         string str => CreateStringFilter(taskField,
+                                          isEqual
+                                            ? FilterStringOperator.Equal
+                                            : FilterStringOperator.NotEqual,
+                                          str),
+         char car => CreateStringFilter(taskField,
+                                        isEqual
+                                          ? FilterStringOperator.Equal
+                                          : FilterStringOperator.NotEqual,
+                                        car.ToString()),
+         DateTime date => CreateDateFilter(taskField,
+                                           isEqual
+                                             ? FilterDateOperator.Equal
+                                             : FilterDateOperator.NotEqual,
+                                           date.ToUniversalTime()
+                                               .ToTimestamp()),
+         TimeSpan timeSpan => CreateDurationFilter(taskField,
+                                                   isEqual
+                                                     ? FilterDurationOperator.Equal
+                                                     : FilterDurationOperator.NotEqual,
+                                                   Duration.FromTimeSpan(timeSpan)),
+         TaskStatus status => CreateTaskStatusFilter(taskField,
+                                                     isEqual
+                                                       ? FilterStatusOperator.Equal
+                                                       : FilterStatusOperator.NotEqual,
+                                                     status.ToGrpcStatus()),
+         BlobStatus status => CreateBlobStatusFilter(taskField,
+                                                     isEqual
+                                                       ? FilterStatusOperator.Equal
+                                                       : FilterStatusOperator.NotEqual,
+                                                     status.ToGrpcStatus()),
+         _ => throw new InvalidOperationException($"Unsupported constant type '{val.GetType()}' in filter expression."),
+       };
+
+  private void OnStringMethodOperator(MethodInfo method,
+                                      bool       notOp = false)
+  {
+    switch (method.Name)
+    {
+      case nameof(string.StartsWith):
+        PushStringFilter(FilterStringOperator.StartsWith);
+        break;
+      case nameof(string.EndsWith):
+        PushStringFilter(FilterStringOperator.EndsWith);
+        break;
+      case nameof(string.Contains):
+        PushStringFilter(notOp
+                           ? FilterStringOperator.NotContains
+                           : FilterStringOperator.Contains);
+        break;
+      default:
+        throw new InvalidOperationException($"Method string.{method.Name} is not supported to filter tasks.");
+    }
+  }
+
+  private void HandleStringExpression(ExpressionType type)
+  {
+    FilterStringOperator op;
+    switch (type)
+    {
+      case ExpressionType.Equal:
+        op = FilterStringOperator.Equal;
+        break;
+      case ExpressionType.NotEqual:
+        op = FilterStringOperator.NotEqual;
+        break;
+      default:
+        throw new InvalidOperationException($"Operator '{type}' is not supported on operands of type string.");
+    }
+
+    PushStringFilter(op);
+  }
+
+  private void PushStringFilter(FilterStringOperator op)
+  {
+    var fieldCount = 0;
+    var constCount = 0;
+    var (rhsFilter, _) = FilterStack.Pop();
+    var (lhsFilter, _) = FilterStack.Pop();
+    var     field = default(TField);
+    string? val   = null;
+    if (lhsFilter is TField lhsField)
+    {
+      // Left hand side is the property
+      field = lhsField;
+      fieldCount++;
+    }
+    else if (lhsFilter is string str)
+    {
+      // Left hand side is a constant
+      val = str;
+      constCount++;
+    }
+    else if (lhsFilter is char car)
+    {
+      // Left hand side is a constant
+      val = car.ToString();
+      constCount++;
+    }
+
+    if (rhsFilter is TField rhsField)
+    {
+      // Right hand side is the property
+      field = rhsField;
+      fieldCount++;
+    }
+    else if (rhsFilter is string str)
+    {
+      // Right hand side is a constant
+      val = str;
+      constCount++;
+    }
+    else if (rhsFilter is char car)
+    {
+      // Right hand side is a constant
+      val = car.ToString();
+      constCount++;
+    }
+
+    if (fieldCount != 1 || constCount != 1)
+    {
+      // Invalid expression
+      throw new InvalidOperationException("Invalid filter expression.");
+    }
+
+    FilterStack.Push((CreateStringFilter(field!,
+                                         op,
+                                         val!)!, typeof(bool)));
+  }
+
+  private void HandleIntegerExpression(ExpressionType type)
+  {
+    FilterNumberOperator op;
+    switch (type)
+    {
+      case ExpressionType.Equal:
+        op = FilterNumberOperator.Equal;
+        break;
+      case ExpressionType.NotEqual:
+        op = FilterNumberOperator.NotEqual;
+        break;
+      case ExpressionType.LessThan:
+        op = FilterNumberOperator.LessThan;
+        break;
+      case ExpressionType.LessThanOrEqual:
+        op = FilterNumberOperator.LessThanOrEqual;
+        break;
+      case ExpressionType.GreaterThan:
+        op = FilterNumberOperator.GreaterThan;
+        break;
+      case ExpressionType.GreaterThanOrEqual:
+        op = FilterNumberOperator.GreaterThanOrEqual;
+        break;
+      default:
+        throw new InvalidOperationException($"Operator '{type}' is not supported on operands of type integer.");
+    }
+
+    var fieldCount = 0;
+    var constCount = 0;
+    var (rhsFilter, _) = FilterStack.Pop();
+    var (lhsFilter, _) = FilterStack.Pop();
+    var  field = default(TField);
+    int? val   = null;
+    if (lhsFilter is TField lhsField)
+    {
+      // Left hand side is the property
+      field = lhsField;
+      fieldCount++;
+    }
+    else if (lhsFilter is int number)
+    {
+      // Left hand side is a constant
+      val = number;
+      constCount++;
+    }
+
+    if (rhsFilter is TField rhsField)
+    {
+      // Right hand side is the property
+      field = rhsField;
+      fieldCount++;
+    }
+    else if (rhsFilter is int number)
+    {
+      // Right hand side is a constant
+      val = number;
+      constCount++;
+    }
+
+    if (fieldCount != 1 || constCount != 1)
+    {
+      // Invalid expression
+      throw new InvalidOperationException("Invalid filter expression.");
+    }
+
+    FilterStack.Push((CreateNumberFilter(field!,
+                                         op,
+                                         val!.Value)!, typeof(bool)));
+  }
+
+  private void HandleDateTimeExpression(ExpressionType type)
+  {
+    FilterDateOperator op;
+    switch (type)
+    {
+      case ExpressionType.Equal:
+        op = FilterDateOperator.Equal;
+        break;
+      case ExpressionType.NotEqual:
+        op = FilterDateOperator.NotEqual;
+        break;
+      case ExpressionType.LessThan:
+        op = FilterDateOperator.Before;
+        break;
+      case ExpressionType.LessThanOrEqual:
+        op = FilterDateOperator.BeforeOrEqual;
+        break;
+      case ExpressionType.GreaterThan:
+        op = FilterDateOperator.After;
+        break;
+      case ExpressionType.GreaterThanOrEqual:
+        op = FilterDateOperator.AfterOrEqual;
+        break;
+      default:
+        throw new InvalidOperationException($"Operator '{type}' is not supported on operands of type DateTime.");
+    }
+
+    var fieldCount = 0;
+    var constCount = 0;
+    var (rhsFilter, _) = FilterStack.Pop();
+    var (lhsFilter, _) = FilterStack.Pop();
+    var        field = default(TField);
+    Timestamp? val   = null;
+    if (lhsFilter is TField lhsField)
+    {
+      // Left hand side is the property
+      field = lhsField;
+      fieldCount++;
+    }
+    else if (lhsFilter is DateTime date)
+    {
+      // Left hand side is a constant
+      val = date.ToUniversalTime()
+                .ToTimestamp();
+      constCount++;
+    }
+
+    if (rhsFilter is TField rhsField)
+    {
+      // Right hand side is the property
+      field = rhsField;
+      fieldCount++;
+    }
+    else if (rhsFilter is DateTime date)
+    {
+      // Right hand side is a constant
+      val = date.ToUniversalTime()
+                .ToTimestamp();
+      constCount++;
+    }
+
+    if (fieldCount != 1 || constCount != 1)
+    {
+      // Invalid expression
+      throw new InvalidOperationException("Invalid filter expression.");
+    }
+
+    FilterStack.Push((CreateDateFilter(field!,
+                                       op,
+                                       val!)!, typeof(bool)));
+  }
+
+  private void HandleTimeSpanExpression(ExpressionType type)
+  {
+    FilterDurationOperator op;
+    switch (type)
+    {
+      case ExpressionType.Equal:
+        op = FilterDurationOperator.Equal;
+        break;
+      case ExpressionType.NotEqual:
+        op = FilterDurationOperator.NotEqual;
+        break;
+      case ExpressionType.GreaterThan:
+        op = FilterDurationOperator.LongerThan;
+        break;
+      case ExpressionType.GreaterThanOrEqual:
+        op = FilterDurationOperator.LongerThanOrEqual;
+        break;
+      case ExpressionType.LessThan:
+        op = FilterDurationOperator.ShorterThan;
+        break;
+      case ExpressionType.LessThanOrEqual:
+        op = FilterDurationOperator.ShorterThanOrEqual;
+        break;
+      default:
+        throw new InvalidOperationException($"Operator '{type}' is not supported on operands of type TimeSpan.");
+    }
+
+    var fieldCount = 0;
+    var constCount = 0;
+    var (rhsFilter, _) = FilterStack.Pop();
+    var (lhsFilter, _) = FilterStack.Pop();
+    var       field = default(TField);
+    Duration? val   = null;
+    if (lhsFilter is TField lhsField)
+    {
+      // Left hand side is the property
+      field = lhsField;
+      fieldCount++;
+    }
+    else if (lhsFilter is TimeSpan timeSpan)
+    {
+      // Left hand side is a constant
+      val = Duration.FromTimeSpan(timeSpan);
+      constCount++;
+    }
+
+    if (rhsFilter is TField rhsField)
+    {
+      // Right hand side is the property
+      field = rhsField;
+      fieldCount++;
+    }
+    else if (rhsFilter is TimeSpan timeSpan)
+    {
+      // Right hand side is a constant
+      val = Duration.FromTimeSpan(timeSpan);
+      constCount++;
+    }
+
+    if (fieldCount != 1 || constCount != 1)
+    {
+      // Invalid expression
+      throw new InvalidOperationException("Invalid filter expression.");
+    }
+
+    FilterStack.Push((CreateDurationFilter(field!,
+                                           op,
+                                           val!)!, typeof(bool)));
+  }
+
+  private void HandleTaskStatusExpression(ExpressionType type)
+  {
+    FilterStatusOperator op;
+    switch (type)
+    {
+      case ExpressionType.Equal:
+        op = FilterStatusOperator.Equal;
+        break;
+      case ExpressionType.NotEqual:
+        op = FilterStatusOperator.NotEqual;
+        break;
+      default:
+        throw new InvalidOperationException($"Operator '{type}' is not supported on operands of type BlobStatus.");
+    }
+
+    var fieldCount = 0;
+    var constCount = 0;
+    var (rhsFilter, _) = FilterStack.Pop();
+    var (lhsFilter, _) = FilterStack.Pop();
+    var                     field = default(TField);
+    Api.gRPC.V1.TaskStatus? val   = null;
+    if (lhsFilter is TField lhsField)
+    {
+      // Left hand side is the property
+      field = lhsField;
+      fieldCount++;
+    }
+    else if (lhsFilter is TaskStatus status)
+    {
+      // Left hand side is a constant
+      val = status.ToGrpcStatus();
+      constCount++;
+    }
+    else if (lhsFilter is int statusInt)
+    {
+      // Left hand side is a constant
+      val = ((TaskStatus)statusInt).ToGrpcStatus();
+      constCount++;
+    }
+
+    if (rhsFilter is TField rhsField)
+    {
+      // Right hand side is the property
+      field = rhsField;
+      fieldCount++;
+    }
+    else if (rhsFilter is TaskStatus status)
+    {
+      // Right hand side is a constant
+      val = status.ToGrpcStatus();
+      constCount++;
+    }
+    else if (rhsFilter is int statusInt)
+    {
+      // Right hand side is a constant
+      val = ((TaskStatus)statusInt).ToGrpcStatus();
+      constCount++;
+    }
+
+    if (fieldCount != 1 || constCount != 1)
+    {
+      throw new InvalidOperationException("Invalid filter expression.");
+    }
+
+    FilterStack.Push((CreateTaskStatusFilter(field!,
+                                             op,
+                                             val!.Value)!, typeof(bool)));
+  }
+
+  private void HandleBlobStatusExpression(ExpressionType type)
+  {
+    FilterStatusOperator op;
+    switch (type)
+    {
+      case ExpressionType.Equal:
+        op = FilterStatusOperator.Equal;
+        break;
+      case ExpressionType.NotEqual:
+        op = FilterStatusOperator.NotEqual;
+        break;
+      default:
+        throw new InvalidOperationException($"Operator '{type}' is not supported on operands of type BlobStatus.");
+    }
+
+    var fieldCount = 0;
+    var constCount = 0;
+    var (rhsFilter, _) = FilterStack.Pop();
+    var (lhsFilter, _) = FilterStack.Pop();
+    var           field = default(TField);
+    ResultStatus? val   = null;
+    if (lhsFilter is TField lhsFilterField)
+    {
+      // Left hand side is the property
+      field = lhsFilterField;
+      fieldCount++;
+    }
+    else if (lhsFilter is BlobStatus status)
+    {
+      // Left hand side is a constant
+      val = status.ToGrpcStatus();
+      constCount++;
+    }
+    else if (lhsFilter is int statusInt)
+    {
+      // Left hand side is a constant
+      val = ((BlobStatus)statusInt).ToGrpcStatus();
+      constCount++;
+    }
+
+    if (rhsFilter is TField rhsFilterField)
+    {
+      // Right hand side is the property
+      field = rhsFilterField;
+      fieldCount++;
+    }
+    else if (rhsFilter is BlobStatus status)
+    {
+      // Right hand side is a constant
+      val = status.ToGrpcStatus();
+      constCount++;
+    }
+    else if (rhsFilter is int statusInt)
+    {
+      // Right hand side is a constant
+      val = ((BlobStatus)statusInt).ToGrpcStatus();
+      constCount++;
+    }
+
+    if (fieldCount != 1 || constCount != 1)
+    {
+      throw new InvalidOperationException("Invalid filter expression.");
+    }
+
+    FilterStack.Push((CreateBlobStatusFilter(field!,
+                                             op,
+                                             val!.Value)!, typeof(bool)));
+  }
+
+
+  protected abstract TFilterField CreateStringFilter(TField               field,
+                                                     FilterStringOperator op,
+                                                     string               val);
+
+  protected abstract TFilterField CreateNumberFilter(TField               field,
+                                                     FilterNumberOperator op,
+                                                     int                  val);
+
+  protected abstract TFilterField CreateDateFilter(TField             field,
+                                                   FilterDateOperator op,
+                                                   Timestamp          val);
+
+  protected abstract TFilterField CreateDurationFilter(TField                 field,
+                                                       FilterDurationOperator op,
+                                                       Duration               val);
+
+  protected abstract TFilterField CreateTaskStatusFilter(TField                 field,
+                                                         FilterStatusOperator   op,
+                                                         Api.gRPC.V1.TaskStatus val);
+
+  protected abstract TFilterField CreateBlobStatusFilter(TField               field,
+                                                         FilterStatusOperator op,
+                                                         ResultStatus         val);
+
+  protected abstract void OnIndexerAccess();
+  protected abstract bool PushProperty(MemberExpression member);
 }

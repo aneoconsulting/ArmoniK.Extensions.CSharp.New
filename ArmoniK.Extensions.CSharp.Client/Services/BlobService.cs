@@ -31,7 +31,7 @@ using ArmoniK.Extensions.CSharp.Client.Common.Services;
 using ArmoniK.Extensions.CSharp.Client.Exceptions;
 using ArmoniK.Extensions.CSharp.Client.Handles;
 using ArmoniK.Extensions.CSharp.Client.Queryable;
-using ArmoniK.Extensions.CSharp.Client.Queryable.BlobState;
+using ArmoniK.Extensions.CSharp.Client.Queryable.BlobStateQuery;
 using ArmoniK.Extensions.CSharp.Common.Common.Domain.Blob;
 using ArmoniK.Utils;
 using ArmoniK.Utils.Pool;

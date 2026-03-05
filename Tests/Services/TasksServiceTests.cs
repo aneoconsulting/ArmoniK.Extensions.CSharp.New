@@ -36,6 +36,7 @@ using Tests.Configuration;
 using Tests.Helpers;
 
 using TaskStatus = ArmoniK.Extensions.CSharp.Common.Common.Domain.Task.TaskStatus;
+using TaskSummary = ArmoniK.Api.gRPC.V1.Tasks.TaskSummary;
 using V1_TaskStatus = ArmoniK.Api.gRPC.V1.TaskStatus;
 
 namespace Tests.Services;
@@ -444,32 +445,26 @@ public class TasksServiceTests
 
     var paginationOptions = new TaskPagination
                             {
-                              Page          = 1,
-                              PageSize      = 10,
-                              SortDirection = SortDirection.Asc,
-                              Filter        = new Filters(),
+                              UseDetailedVersion = false,
+                              Page               = 1,
+                              PageSize           = 10,
+                              SortDirection      = SortDirection.Asc,
+                              Filter             = new Filters(),
                             };
 
     var result = await client.TasksService.ListTasksAsync(paginationOptions)
-                             .ToListAsync()
                              .ConfigureAwait(false);
     Assert.Multiple(() =>
                     {
-                      Assert.That(result,
+                      Assert.That(result.TasksSummaries,
                                   Is.Not.Null,
                                   "Result should not be null.");
-                      Assert.That(result,
-                                  Has.Count.EqualTo(1),
-                                  "Expected one page of tasks.");
-                      Assert.That(result.Count,
-                                  Is.EqualTo(1));
-                      Assert.That(result[0].TotalTasks,
+                      Assert.That(result.TotalTasks,
                                   Is.EqualTo(2));
                     });
 
-    var tasksData = result[0]
-                    .TasksData.ToList();
-    Assert.That(tasksData.Count,
+    var tasksData = result.TasksSummaries;
+    Assert.That(tasksData!.Count,
                 Is.EqualTo(2));
 
     var expectedTaskIds = new List<string>
@@ -483,12 +478,12 @@ public class TasksServiceTests
                              TaskStatus.Cancelling,
                            };
 
-    for (var i = 0; i < tasksData.Count; i++)
+    for (var i = 0; i < tasksData!.Count(); i++)
     {
       Assert.That(expectedTaskIds[i],
-                  Is.EqualTo(tasksData[i].Item1));
+                  Is.EqualTo(tasksData![i].TaskId));
       Assert.That(expectedStatuses[i],
-                  Is.EqualTo(tasksData[i].Item2));
+                  Is.EqualTo(tasksData![i].Status));
     }
   }
 
@@ -589,26 +584,53 @@ public class TasksServiceTests
                              SessionId = "sessionId1",
                            },
                          },
-                         Total = 1,
+                         Total = 2,
                        };
     client.CallInvokerMock.SetupAsyncUnaryCallInvokerMock<ListTasksRequest, ListTasksDetailedResponse>(taskResponse);
 
     var paginationOptions = new TaskPagination
                             {
-                              Page          = 1,
-                              PageSize      = 10,
-                              Filter        = new Filters(),
-                              SortDirection = SortDirection.Asc,
+                              UseDetailedVersion = true,
+                              Page               = 1,
+                              PageSize           = 10,
+                              Filter             = new Filters(),
+                              SortDirection      = SortDirection.Asc,
                             };
 
-    var result = await client.TasksService.ListTasksDetailedAsync(new SessionInfo("sessionId1"),
-                                                                  paginationOptions)
-                             .FirstOrDefaultAsync()
+    var result = await client.TasksService.ListTasksAsync(paginationOptions)
                              .ConfigureAwait(false);
 
-    Assert.That(result,
-                Is.Not.Null,
-                "Result should not be null.");
+    Assert.Multiple(() =>
+                    {
+                      Assert.That(result.TaskDetails,
+                                  Is.Not.Null,
+                                  "Result should not be null.");
+                      Assert.That(result.TotalTasks,
+                                  Is.EqualTo(2));
+                    });
+
+    var tasksDetails = result.TaskDetails;
+    Assert.That(tasksDetails!.Count,
+                Is.EqualTo(2));
+
+    var expectedTaskIds = new List<string>
+                          {
+                            "taskId1",
+                            "taskId2",
+                          };
+    var expectedStatuses = new List<TaskStatus>
+                           {
+                             TaskStatus.Completed,
+                             TaskStatus.Cancelling,
+                           };
+
+    for (var i = 0; i < tasksDetails!.Count(); i++)
+    {
+      Assert.That(expectedTaskIds[i],
+                  Is.EqualTo(tasksDetails![i].TaskId));
+      Assert.That(expectedStatuses[i],
+                  Is.EqualTo(tasksDetails![i].Status));
+    }
   }
 
   [Test]

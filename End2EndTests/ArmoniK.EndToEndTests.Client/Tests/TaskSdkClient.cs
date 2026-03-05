@@ -19,6 +19,7 @@ using System.Text;
 using ArmoniK.Extensions.CSharp.Client.Common.Domain.Blob;
 using ArmoniK.Extensions.CSharp.Client.Common.Domain.Task;
 using ArmoniK.Extensions.CSharp.Client.Handles;
+using ArmoniK.Extensions.CSharp.Client.Queryable;
 
 namespace ArmoniK.EndToEndTests.Client.Tests;
 
@@ -74,6 +75,57 @@ public class TaskSdkClient : ClientBase
                                   Is.EqualTo("blobOutputString"));
                       Assert.That(resultString,
                                   Is.EqualTo(str));
+                    });
+  }
+
+  [Test]
+  public async Task TaskQueries()
+  {
+    var callback = new Callback();
+    var taskDefinition = new TaskDefinition().WithLibrary(WorkerLibrary!)
+                                             .WithInput("inputString",
+                                                        BlobDefinition.FromString("blobInputString",
+                                                                                  "Hello!"))
+                                             .WithOutput("outputString",
+                                                         BlobDefinition.CreateOutput("blobOutputString")
+                                                                       .WithCallback(callback))
+                                             .WithTaskOptions(TaskConfiguration!);
+    var taskInfo = await Client!.TasksService.SubmitTasksAsync(SessionHandle!,
+                                                               [taskDefinition])
+                                .FirstAsync()
+                                .ConfigureAwait(false);
+
+    var allTasks = await Client!.TasksService.AsQueryable()
+                                .Where(task => task.SessionId == SessionHandle!.SessionInfo.SessionId)
+                                .ToAsyncEnumerable()
+                                .ToArrayAsync()
+                                .ConfigureAwait(false);
+    var taskSummary1 = Client!.TasksService.AsQueryable()
+                              .Where(task => task.TaskId == taskInfo.TaskId)
+                              .First();
+    var taskSummary2 = Client!.TasksService.AsQueryable()
+                              .Where(task => task.TaskId == taskInfo.TaskId)
+                              .FirstOrDefault();
+    var taskDetailed = await Client!.TasksService.AsQueryable()
+                                    .Where(task => task.TaskId == taskInfo.TaskId)
+                                    .AsTaskDetailed()
+                                    .FirstAsync()
+                                    .ConfigureAwait(false);
+
+    Assert.Multiple(() =>
+                    {
+                      Assert.That(allTasks,
+                                  Has.Exactly(1)
+                                     .Items);
+                      Assert.That(allTasks[0].TaskId,
+                                  Is.EqualTo(taskInfo.TaskId));
+
+                      Assert.That(taskSummary1.TaskId,
+                                  Is.EqualTo(taskInfo.TaskId));
+                      Assert.That(taskSummary2!.TaskId,
+                                  Is.EqualTo(taskInfo.TaskId));
+                      Assert.That(taskDetailed.TaskId,
+                                  Is.EqualTo(taskInfo.TaskId));
                     });
   }
 
