@@ -239,8 +239,8 @@ public static class TaskStateExt
          TaskId           = taskDetailed.Id,
          Status           = taskDetailed.Status.ToInternalStatus(),
          CreateAt         = taskDetailed.CreatedAt.ToDateTime(),
-         StartedAt        = taskDetailed.StartedAt.ToDateTime(),
-         EndedAt          = taskDetailed.EndedAt.ToDateTime(),
+         StartedAt        = taskDetailed.StartedAt?.ToDateTime(),
+         EndedAt          = taskDetailed.EndedAt?.ToDateTime(),
          SessionId        = taskDetailed.SessionId,
          PayloadId        = taskDetailed.PayloadId,
        };

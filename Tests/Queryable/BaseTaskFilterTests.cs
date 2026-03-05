@@ -177,7 +177,7 @@ public class BaseTaskFilterTests
        {
          UseDetailedVersion = useDetailedVersion,
          Filter             = filter,
-         Page               = 1,
+         Page               = 0,
          PageSize           = 1000,
          SortDirection = ascendingSort
                            ? SortDirection.Asc

@@ -55,12 +55,9 @@ internal class TaskSummaryQueryExecution : QueryExecution<TaskPage, TaskSummary,
 
   protected override async Task<TaskPage> RequestInstancesAsync(Pagination<Filters, TaskField> pagination,
                                                                 CancellationToken              cancellationToken)
-  {
-    pagination.Page++;
-    return await tasksService_.ListTasksAsync((TaskPagination)pagination,
-                                              cancellationToken)
-                              .ConfigureAwait(false);
-  }
+    => await tasksService_.ListTasksAsync((TaskPagination)pagination,
+                                          cancellationToken)
+                          .ConfigureAwait(false);
 
   protected override QueryExpressionTreeVisitor<TaskSummary, TaskField, Filters, FiltersAnd, FilterField> CreateQueryExpressionTreeVisitor()
     => new TaskSummaryQueryExpressionTreeVisitor();

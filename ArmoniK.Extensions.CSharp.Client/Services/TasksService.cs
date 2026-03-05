@@ -100,6 +100,7 @@ public class TasksService : ITasksService
                     PageSize = paginationOptions.PageSize,
                     Sort = new ListTasksRequest.Types.Sort
                            {
+                             Field     = paginationOptions.SortField,
                              Direction = paginationOptions.SortDirection.ToGrpc(),
                            },
                   };

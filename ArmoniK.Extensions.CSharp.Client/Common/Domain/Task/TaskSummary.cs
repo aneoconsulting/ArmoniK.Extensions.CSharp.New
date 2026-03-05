@@ -95,8 +95,8 @@ public static class TaskSummaryExt
          TaskId                = taskSummary.Id,
          Status                = taskSummary.Status.ToInternalStatus(),
          CreateAt              = taskSummary.CreatedAt.ToDateTime(),
-         StartedAt             = taskSummary.StartedAt.ToDateTime(),
-         EndedAt               = taskSummary.EndedAt.ToDateTime(),
+         StartedAt             = taskSummary.StartedAt?.ToDateTime(),
+         EndedAt               = taskSummary.EndedAt?.ToDateTime(),
          SessionId             = taskSummary.SessionId,
          PayloadId             = taskSummary.PayloadId,
        };
