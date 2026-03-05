@@ -98,7 +98,8 @@ public class PartitionsService : IPartitionsService
                                                                   PageSize = partitionPagination.PageSize,
                                                                   Sort = new ListPartitionsRequest.Types.Sort
                                                                          {
-                                                                           Direction = (SortDirection)partitionPagination.SortDirection,
+                                                                            Field = partitionPagination.SortField,
+                                                                            Direction = (SortDirection)partitionPagination.SortDirection,
                                                                          },
                                                                 })
                                            .ConfigureAwait(false);

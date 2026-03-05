@@ -18,121 +18,12 @@ using ArmoniK.Api.gRPC.V1;
 using ArmoniK.Api.gRPC.V1.Partitions;
 using ArmoniK.Extensions.CSharp.Client.Common.Domain.Partition;
 using ArmoniK.Extensions.CSharp.Client.Common.Enum;
+using ArmoniK.Extensions.CSharp.Client.Queryable.PartitionQuery;
 
 namespace Tests.Queryable;
 
 public class BasePartitionFilterTests
 {
-  private static readonly Dictionary<string, PartitionRawEnumField> MemberName2EnumField_ = new()
-                                                                                            {
-                                                                                              {
-                                                                                                nameof(Partition.PartitionId), PartitionRawEnumField.Id
-                                                                                              },
-                                                                                              {
-                                                                                                nameof(Partition.PodMax), PartitionRawEnumField.PodMax
-                                                                                              },
-                                                                                              {
-                                                                                                nameof(Partition.PodReserved), PartitionRawEnumField.PodReserved
-                                                                                              },
-                                                                                              {
-                                                                                                nameof(Partition.PreemptionPercentage),
-                                                                                                PartitionRawEnumField.PreemptionPercentage
-                                                                                              },
-                                                                                              {
-                                                                                                nameof(Partition.Priority), PartitionRawEnumField.Priority
-                                                                                              },
-                                                                                              {
-                                                                                                nameof(Partition.ParentPartitionIds),
-                                                                                                PartitionRawEnumField.ParentPartitionIds
-                                                                                              },
-                                                                                            };
-
-  private static readonly Dictionary<string, FilterStringOperator> Op2EnumStringOp = new()
-                                                                                     {
-                                                                                       {
-                                                                                         "==", FilterStringOperator.Equal
-                                                                                       },
-                                                                                       {
-                                                                                         "!=", FilterStringOperator.NotEqual
-                                                                                       },
-                                                                                       {
-                                                                                         "Contains", FilterStringOperator.Contains
-                                                                                       },
-                                                                                       {
-                                                                                         "NotContains", FilterStringOperator.NotContains
-                                                                                       },
-                                                                                       {
-                                                                                         "StartsWith", FilterStringOperator.StartsWith
-                                                                                       },
-                                                                                       {
-                                                                                         "EndsWith", FilterStringOperator.EndsWith
-                                                                                       },
-                                                                                     };
-
-  private static readonly Dictionary<string, FilterNumberOperator> Op2EnumIntOp = new()
-                                                                                  {
-                                                                                    {
-                                                                                      "==", FilterNumberOperator.Equal
-                                                                                    },
-                                                                                    {
-                                                                                      "!=", FilterNumberOperator.NotEqual
-                                                                                    },
-                                                                                    {
-                                                                                      "<", FilterNumberOperator.LessThan
-                                                                                    },
-                                                                                    {
-                                                                                      "<=", FilterNumberOperator.LessThanOrEqual
-                                                                                    },
-                                                                                    {
-                                                                                      ">", FilterNumberOperator.GreaterThan
-                                                                                    },
-                                                                                    {
-                                                                                      ">=", FilterNumberOperator.GreaterThanOrEqual
-                                                                                    },
-                                                                                  };
-
-  private static readonly Dictionary<string, FilterStatusOperator> Op2EnumStatusOp = new()
-                                                                                     {
-                                                                                       {
-                                                                                         "==", FilterStatusOperator.Equal
-                                                                                       },
-                                                                                       {
-                                                                                         "!=", FilterStatusOperator.NotEqual
-                                                                                       },
-                                                                                     };
-
-  private static readonly Dictionary<string, FilterDateOperator> Op2EnumDateOp = new()
-                                                                                 {
-                                                                                   {
-                                                                                     "==", FilterDateOperator.Equal
-                                                                                   },
-                                                                                   {
-                                                                                     "!=", FilterDateOperator.NotEqual
-                                                                                   },
-                                                                                   {
-                                                                                     "<", FilterDateOperator.Before
-                                                                                   },
-                                                                                   {
-                                                                                     "<=", FilterDateOperator.BeforeOrEqual
-                                                                                   },
-                                                                                   {
-                                                                                     ">", FilterDateOperator.After
-                                                                                   },
-                                                                                   {
-                                                                                     ">=", FilterDateOperator.AfterOrEqual
-                                                                                   },
-                                                                                 };
-
-  private static readonly Dictionary<string, FilterArrayOperator> Op2EnumArrayOp = new()
-                                                                                   {
-                                                                                     {
-                                                                                       "Contains", FilterArrayOperator.Contains
-                                                                                     },
-                                                                                     {
-                                                                                       "NotContains", FilterArrayOperator.NotContains
-                                                                                     },
-                                                                                   };
-
   protected PartitionPagination BuildPartitionPagination(Filters filter,
                                                          string  sortCriteria  = null!,
                                                          bool    ascendingSort = true)
@@ -150,7 +41,7 @@ public class BasePartitionFilterTests
                                            {
                                              Field = string.IsNullOrEmpty(sortCriteria)
                                                        ? PartitionRawEnumField.Id
-                                                       : MemberName2EnumField_[sortCriteria],
+                                                       : PartitionMaps.MemberName2EnumField_[sortCriteria],
                                            },
                      },
        };
@@ -160,7 +51,7 @@ public class BasePartitionFilterTests
        {
          PartitionRawField = new PartitionRawField
                              {
-                               Field = MemberName2EnumField_[fieldname],
+                               Field = PartitionMaps.MemberName2EnumField_[fieldname],
                              },
        };
 
@@ -172,7 +63,7 @@ public class BasePartitionFilterTests
          Field = BuildPartitionField(fieldName),
          FilterString = new FilterString
                         {
-                          Operator = Op2EnumStringOp[op],
+                          Operator = FiltersMaps.Op2EnumStringOp_[op],
                           Value    = value,
                         },
        };
@@ -185,7 +76,7 @@ public class BasePartitionFilterTests
          Field = BuildPartitionField(fieldName),
          FilterNumber = new FilterNumber
                         {
-                          Operator = Op2EnumIntOp[op],
+                          Operator = FiltersMaps.Op2EnumIntOp_[op],
                           Value    = value,
                         },
        };
@@ -198,7 +89,7 @@ public class BasePartitionFilterTests
          Field = BuildPartitionField(fieldName),
          FilterArray = new FilterArray
                        {
-                         Operator = Op2EnumArrayOp[op],
+                         Operator = FiltersMaps.Op2EnumArrayOp_[op],
                          Value    = val,
                        },
        };
