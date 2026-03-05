@@ -14,6 +14,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using System.Collections.Immutable;
+
 using ArmoniK.Extensions.CSharp.Client.Common.Domain.Partition;
 
 using NUnit.Framework;
@@ -26,11 +28,7 @@ public class PartitionTests
   [Test]
   public void CreatePartitionTest()
   {
-    var parentPartitionIds = new List<string>
-                             {
-                               "parent1",
-                               "parent2",
-                             };
+    string[] parentPartitionIds = ["parent1", "parent2"];
     var podConfiguration = new List<KeyValuePair<string, string>>
                            {
                              new("key1",
@@ -41,16 +39,17 @@ public class PartitionTests
 
     var partition = new Partition
                     {
-                      Id                   = "partition1",
-                      ParentPartitionIds   = parentPartitionIds,
-                      PodConfiguration     = podConfiguration,
+                      PartitionId        = "partition1",
+                      ParentPartitionIds = parentPartitionIds.ToImmutableArray(),
+                      PodConfiguration = podConfiguration.ToDictionary(pair => pair.Key,
+                                                                       pair => pair.Value),
                       PodMax               = 100,
                       PodReserved          = 10,
                       PreemptionPercentage = 20,
                       Priority             = 1,
                     };
 
-    Assert.That(partition.Id,
+    Assert.That(partition.PartitionId,
                 Is.EqualTo("partition1"));
     Assert.That(partition.ParentPartitionIds,
                 Is.EqualTo(parentPartitionIds));
@@ -69,11 +68,7 @@ public class PartitionTests
   [Test]
   public void PartitionEqualityTest()
   {
-    var parentPartitionIds = new List<string>
-                             {
-                               "parent1",
-                               "parent2",
-                             };
+    string[] parentPartitionIds = ["parent1", "parent2"];
     var podConfiguration = new List<KeyValuePair<string, string>>
                            {
                              new("key1",
@@ -84,9 +79,10 @@ public class PartitionTests
 
     var partition1 = new Partition
                      {
-                       Id                   = "partition1",
-                       ParentPartitionIds   = parentPartitionIds,
-                       PodConfiguration     = podConfiguration,
+                       PartitionId        = "partition1",
+                       ParentPartitionIds = parentPartitionIds.ToImmutableArray(),
+                       PodConfiguration = podConfiguration.ToDictionary(pair => pair.Key,
+                                                                        pair => pair.Value),
                        PodMax               = 100,
                        PodReserved          = 10,
                        PreemptionPercentage = 20,
@@ -95,9 +91,10 @@ public class PartitionTests
 
     var partition2 = new Partition
                      {
-                       Id                   = "partition1",
-                       ParentPartitionIds   = parentPartitionIds,
-                       PodConfiguration     = podConfiguration,
+                       PartitionId        = "partition1",
+                       ParentPartitionIds = parentPartitionIds.ToImmutableArray(),
+                       PodConfiguration = podConfiguration.ToDictionary(pair => pair.Key,
+                                                                        pair => pair.Value),
                        PodMax               = 100,
                        PodReserved          = 10,
                        PreemptionPercentage = 20,
@@ -111,11 +108,7 @@ public class PartitionTests
   [Test]
   public void PartitionInequalityTest()
   {
-    var parentPartitionIds1 = new List<string>
-                              {
-                                "parent1",
-                                "parent2",
-                              };
+    string[] parentPartitionIds1 = ["parent1", "parent2"];
     var podConfiguration1 = new List<KeyValuePair<string, string>>
                             {
                               new("key1",
@@ -126,9 +119,10 @@ public class PartitionTests
 
     var partition1 = new Partition
                      {
-                       Id                   = "partition1",
-                       ParentPartitionIds   = parentPartitionIds1,
-                       PodConfiguration     = podConfiguration1,
+                       PartitionId        = "partition1",
+                       ParentPartitionIds = parentPartitionIds1.ToImmutableArray(),
+                       PodConfiguration = podConfiguration1.ToDictionary(pair => pair.Key,
+                                                                         pair => pair.Value),
                        PodMax               = 100,
                        PodReserved          = 10,
                        PreemptionPercentage = 20,
@@ -150,9 +144,10 @@ public class PartitionTests
 
     var partition2 = new Partition
                      {
-                       Id                   = "partition2",
-                       ParentPartitionIds   = parentPartitionIds2,
-                       PodConfiguration     = podConfiguration2,
+                       PartitionId        = "partition2",
+                       ParentPartitionIds = parentPartitionIds2.ToImmutableArray(),
+                       PodConfiguration = podConfiguration2.ToDictionary(pair => pair.Key,
+                                                                         pair => pair.Value),
                        PodMax               = 200,
                        PodReserved          = 20,
                        PreemptionPercentage = 30,

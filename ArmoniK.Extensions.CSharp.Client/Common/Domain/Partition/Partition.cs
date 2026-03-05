@@ -14,7 +14,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Linq;
 
 using ArmoniK.Api.gRPC.V1.Partitions;
 
@@ -29,17 +32,17 @@ public record Partition
   /// <summary>
   ///   Identifier of the partition.
   /// </summary>
-  public string Id { get; init; } = string.Empty;
+  public string PartitionId { get; init; } = string.Empty;
 
   /// <summary>
   ///   Collection of identifiers for parent partitions.
   /// </summary>
-  public IEnumerable<string> ParentPartitionIds { get; init; } = [];
+  public ImmutableArray<string> ParentPartitionIds { get; init; } = ImmutableArray<string>.Empty;
 
   /// <summary>
   ///   Configuration settings for pods within the partition, represented as key-value pairs.
   /// </summary>
-  public IEnumerable<KeyValuePair<string, string>> PodConfiguration { get; init; } = [];
+  public IReadOnlyDictionary<string, string> PodConfiguration { get; init; } = new Dictionary<string, string>();
 
   /// <summary>
   ///   Maximum number of pods that can be allocated to this partition.
@@ -60,6 +63,52 @@ public record Partition
   ///   Priority of the partition, which may influence scheduling decisions.
   /// </summary>
   public long Priority { get; init; }
+
+  /// <summary>
+  ///   Override of the equality method to compare two Partition instances based on their properties.
+  /// </summary>
+  public virtual bool Equals(Partition? other)
+  {
+    if (other is null)
+    {
+      return false;
+    }
+
+    if (ReferenceEquals(this,
+                        other))
+    {
+      return true;
+    }
+
+    return ParentPartitionIds.SequenceEqual(other.ParentPartitionIds) && PodConfiguration.Count == other.PodConfiguration.Count &&
+           PodConfiguration.All(kvp => other.PodConfiguration.TryGetValue(kvp.Key,
+                                                                          out var v) && v == kvp.Value) && PartitionId == other.PartitionId && PodMax == other.PodMax &&
+           PodReserved == other.PodReserved && PreemptionPercentage == other.PreemptionPercentage && Priority == other.Priority;
+  }
+
+  /// <summary>
+  ///   Override of the GetHashCode method to generate a hash code based on the properties of the Partition instance.
+  /// </summary>
+  public override int GetHashCode()
+  {
+    var tagsHash = ParentPartitionIds.Aggregate(0,
+                                                (hash,
+                                                 s) => HashCode.Combine(hash,
+                                                                        s));
+    var dictHash = PodConfiguration.OrderBy(kvp => kvp.Key)
+                                   .Aggregate(0,
+                                              (hash,
+                                               kvp) => HashCode.Combine(hash,
+                                                                        kvp.Key,
+                                                                        kvp.Value));
+    return HashCode.Combine(tagsHash,
+                            dictHash,
+                            PartitionId,
+                            PodMax,
+                            PodReserved,
+                            PreemptionPercentage,
+                            Priority);
+  }
 }
 
 /// <summary>
@@ -75,9 +124,10 @@ public static class PartitionExt
   public static Partition ToPartition(this PartitionRaw partitionRaw)
     => new()
        {
-         Id                   = partitionRaw.Id,
-         ParentPartitionIds   = partitionRaw.ParentPartitionIds,
-         PodConfiguration     = partitionRaw.PodConfiguration,
+         PartitionId        = partitionRaw.Id,
+         ParentPartitionIds = partitionRaw.ParentPartitionIds.ToImmutableArray(),
+         PodConfiguration = partitionRaw.PodConfiguration.ToDictionary(pair => pair.Key,
+                                                                       pair => pair.Value),
          PodMax               = partitionRaw.PodMax,
          PodReserved          = partitionRaw.PodReserved,
          PreemptionPercentage = partitionRaw.PreemptionPercentage,

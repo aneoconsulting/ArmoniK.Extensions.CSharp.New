@@ -22,6 +22,22 @@ namespace ArmoniK.Extensions.CSharp.Client.Common.Domain.Partition;
 /// <summary>
 ///   Provides pagination capabilities for partition listings, including sorting and filtering functionalities.
 /// </summary>
-public record PartitionPagination : Pagination<Filters, PartitionRawEnumField>
+public record PartitionPagination : Pagination<Filters, PartitionField>
 {
+}
+
+/// <summary>
+///   Represents a page within a paginated list of partitions.
+/// </summary>
+public record PartitionPage
+{
+  /// <summary>
+  ///   Total number of partitions available.
+  /// </summary>
+  public int TotalPartitionCount { get; init; }
+
+  /// <summary>
+  ///   Partitions of the page.
+  /// </summary>
+  public Partition[] Partitions { get; init; } = [];
 }

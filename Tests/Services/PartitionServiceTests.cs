@@ -70,7 +70,7 @@ public class PartitionServiceTests
 
     Assert.Multiple(() =>
                     {
-                      Assert.That(result.Id,
+                      Assert.That(result.PartitionId,
                                   Is.EqualTo(partitionId));
                       Assert.That(result.PodMax,
                                   Is.EqualTo(10));
@@ -183,26 +183,21 @@ public class PartitionServiceTests
 
     client.CallInvokerMock.SetupAsyncUnaryCallInvokerMock<ListPartitionsRequest, ListPartitionsResponse>(response);
 
-    var result = client.PartitionsService.ListPartitionsAsync(new PartitionPagination(),
-                                                              CancellationToken.None);
+    var result = await client.PartitionsService.ListPartitionsAsync(new PartitionPagination(),
+                                                                    CancellationToken.None)
+                             .ConfigureAwait(false);
 
-    var receivedPartitions = new List<Partition>();
-    var totalCount         = 0;
-
-    await foreach (var partitionTuple in result.ConfigureAwait(false))
-    {
-      totalCount = partitionTuple.Item1;
-      receivedPartitions.Add(partitionTuple.Item2);
-    }
+    var receivedPartitions = result.Partitions;
+    var totalCount         = result.TotalPartitionCount;
 
     Assert.Multiple(() =>
                     {
                       Assert.That(totalCount,
                                   Is.EqualTo(2));
                       Assert.That(receivedPartitions,
-                                  Has.Count.EqualTo(2));
+                                  Has.Length.EqualTo(2));
 
-                      Assert.That(receivedPartitions[0].Id,
+                      Assert.That(receivedPartitions[0].PartitionId,
                                   Is.EqualTo("partitionId1"));
                       Assert.That(receivedPartitions[0].PodMax,
                                   Is.EqualTo(10));
@@ -211,7 +206,7 @@ public class PartitionServiceTests
                       Assert.That(receivedPartitions[0].Priority,
                                   Is.EqualTo(2));
 
-                      Assert.That(receivedPartitions[1].Id,
+                      Assert.That(receivedPartitions[1].PartitionId,
                                   Is.EqualTo("partitionId2"));
                       Assert.That(receivedPartitions[1].PodMax,
                                   Is.EqualTo(20));

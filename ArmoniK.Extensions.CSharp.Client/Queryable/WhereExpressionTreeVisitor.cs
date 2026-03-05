@@ -192,16 +192,31 @@ internal abstract class WhereExpressionTreeVisitor<TField, TFilterOr, TFilterAnd
                                 .FirstOrDefault();
           if (ienumerable != null)
           {
-            var val = call.Object.EvaluateExpression();
-            if (val != null)
+            if (hasParameterQualifier)
             {
-              FilterStack.Push((val, val.GetType()));
+              if (call.Arguments.Count != 1)
+              {
+                throw new InvalidExpressionException("Invalid filter: Contains method overload not supported.");
+              }
+
+              Visit(call.Object!);
+              Visit(call.Arguments[0]);
+              PushArrayFilter(notOp);
+            }
+            else
+            {
+              var val = call.Object.EvaluateExpression();
+              if (val != null)
+              {
+                FilterStack.Push((val, val.GetType()));
+              }
+
+              Visit(call.Arguments[0]);
+
+              VisitContainsMethod(call,
+                                  notOp);
             }
 
-            Visit(call.Arguments[0]);
-
-            VisitContainsMethod(call,
-                                notOp);
             return;
           }
         }
@@ -362,7 +377,7 @@ internal abstract class WhereExpressionTreeVisitor<TField, TFilterOr, TFilterAnd
     {
       HandleTaskStatusExpression(expressionType);
     }
-    else if (rhsType == typeof(int))
+    else if (rhsType == typeof(int) || rhsType == typeof(long))
     {
       HandleIntegerExpression(expressionType);
     }
@@ -376,7 +391,7 @@ internal abstract class WhereExpressionTreeVisitor<TField, TFilterOr, TFilterAnd
     }
     else
     {
-      throw new InvalidOperationException("Invalid filter: Operands of expression type {rhsType.Name} are not supported.");
+      throw new InvalidOperationException($"Invalid filter: Operands of expression type {rhsType.Name} are not supported.");
     }
   }
 
@@ -804,6 +819,11 @@ internal abstract class WhereExpressionTreeVisitor<TField, TFilterOr, TFilterAnd
                                             ? FilterNumberOperator.Equal
                                             : FilterNumberOperator.NotEqual,
                                           number),
+         long number2 => CreateNumberFilter(taskField,
+                                            isEqual
+                                              ? FilterNumberOperator.Equal
+                                              : FilterNumberOperator.NotEqual,
+                                            number2),
          string str => CreateStringFilter(taskField,
                                           isEqual
                                             ? FilterStringOperator.Equal
@@ -837,6 +857,67 @@ internal abstract class WhereExpressionTreeVisitor<TField, TFilterOr, TFilterAnd
                                                      status.ToGrpcStatus()),
          _ => throw new InvalidOperationException($"Unsupported constant type '{val.GetType()}' in filter expression."),
        };
+
+  private void PushArrayFilter(bool notOp = false)
+  {
+    var op = notOp
+               ? FilterArrayOperator.NotContains
+               : FilterArrayOperator.Contains;
+
+    var fieldCount = 0;
+    var constCount = 0;
+    var (rhsFilter, _) = FilterStack.Pop();
+    var (lhsFilter, _) = FilterStack.Pop();
+    var     field = default(TField);
+    string? val   = null;
+    if (lhsFilter is TField lhsField)
+    {
+      // Left hand side is the property
+      field = lhsField;
+      fieldCount++;
+    }
+    else if (lhsFilter is string str)
+    {
+      // Left hand side is a constant
+      val = str;
+      constCount++;
+    }
+    else if (lhsFilter is char car)
+    {
+      // Left hand side is a constant
+      val = car.ToString();
+      constCount++;
+    }
+
+    if (rhsFilter is TField rhsField)
+    {
+      // Right hand side is the property
+      field = rhsField;
+      fieldCount++;
+    }
+    else if (rhsFilter is string str)
+    {
+      // Right hand side is a constant
+      val = str;
+      constCount++;
+    }
+    else if (rhsFilter is char car)
+    {
+      // Right hand side is a constant
+      val = car.ToString();
+      constCount++;
+    }
+
+    if (fieldCount != 1 || constCount != 1)
+    {
+      // Invalid expression
+      throw new InvalidOperationException("Invalid filter expression.");
+    }
+
+    FilterStack.Push((CreateArrayFilter(field!,
+                                        op,
+                                        val!)!, typeof(bool)));
+  }
 
   private void OnStringMethodOperator(MethodInfo method,
                                       bool       notOp = false)
@@ -965,8 +1046,8 @@ internal abstract class WhereExpressionTreeVisitor<TField, TFilterOr, TFilterAnd
     var constCount = 0;
     var (rhsFilter, _) = FilterStack.Pop();
     var (lhsFilter, _) = FilterStack.Pop();
-    var  field = default(TField);
-    int? val   = null;
+    var   field = default(TField);
+    long? val   = null;
     if (lhsFilter is TField lhsField)
     {
       // Left hand side is the property
@@ -977,6 +1058,12 @@ internal abstract class WhereExpressionTreeVisitor<TField, TFilterOr, TFilterAnd
     {
       // Left hand side is a constant
       val = number;
+      constCount++;
+    }
+    else if (rhsFilter is long number2)
+    {
+      // Right hand side is a constant
+      val = number2;
       constCount++;
     }
 
@@ -990,6 +1077,12 @@ internal abstract class WhereExpressionTreeVisitor<TField, TFilterOr, TFilterAnd
     {
       // Right hand side is a constant
       val = number;
+      constCount++;
+    }
+    else if (rhsFilter is long number2)
+    {
+      // Right hand side is a constant
+      val = number2;
       constCount++;
     }
 
@@ -1289,9 +1382,13 @@ internal abstract class WhereExpressionTreeVisitor<TField, TFilterOr, TFilterAnd
                                                      FilterStringOperator op,
                                                      string               val);
 
+  protected abstract TFilterField CreateArrayFilter(TField              field,
+                                                    FilterArrayOperator op,
+                                                    string              val);
+
   protected abstract TFilterField CreateNumberFilter(TField               field,
                                                      FilterNumberOperator op,
-                                                     int                  val);
+                                                     long                 val);
 
   protected abstract TFilterField CreateDateFilter(TField             field,
                                                    FilterDateOperator op,

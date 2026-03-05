@@ -14,15 +14,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
-using ArmoniK.Api.gRPC.V1.Partitions;
 using ArmoniK.Extensions.CSharp.Client.Common.Domain.Partition;
-using ArmoniK.Extensions.CSharp.Client.Common.Enum;
 
 namespace ArmoniK.Extensions.CSharp.Client.Common.Services;
 
@@ -31,6 +27,12 @@ namespace ArmoniK.Extensions.CSharp.Client.Common.Services;
 /// </summary>
 public interface IPartitionsService
 {
+  /// <summary>
+  ///   Get a queryable object on Partition instances
+  /// </summary>
+  /// <returns>An IQueryable instance to apply Linq extensions methods on</returns>
+  IQueryable<Partition> AsQueryable();
+
   /// <summary>
   ///   Asynchronously retrieves a partition by its identifier.
   /// </summary>
@@ -45,55 +47,7 @@ public interface IPartitionsService
   /// </summary>
   /// <param name="partitionPagination">The options for pagination, including page number, page size, and sorting.</param>
   /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
-  /// <returns>An asynchronous enumerable of tuples containing the total count and partition information.</returns>
-  IAsyncEnumerable<(int, Partition)> ListPartitionsAsync(PartitionPagination partitionPagination,
-                                                         CancellationToken   cancellationToken);
-}
-
-/// <summary>
-///   Provides extension methods for the <see cref="IPartitionsService" /> interface.
-/// </summary>
-public static class PartitionsServiceExt
-{
-  /// <summary>
-  ///   Asynchronously lists all partitions with support for pagination.
-  /// </summary>
-  /// <param name="partitionService">The partition service instance.</param>
-  /// <param name="pageSize">The number of partitions to retrieve per page.</param>
-  /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
-  /// <returns>An asynchronous enumerable of partitions.</returns>
-  public static async IAsyncEnumerable<Partition> ListAllPartitionsAsync(this IPartitionsService                    partitionService,
-                                                                         int                                        pageSize          = 50,
-                                                                         [EnumeratorCancellation] CancellationToken cancellationToken = default)
-  {
-    var partitionPagination = new PartitionPagination
-                              {
-                                Filter        = new Filters(),
-                                Page          = 0,
-                                PageSize      = pageSize,
-                                SortDirection = SortDirection.Asc,
-                              };
-
-    var                                total     = 0;
-    var                                firstPage = true;
-    IAsyncEnumerable<(int, Partition)> res;
-    while (await (res = partitionService.ListPartitionsAsync(partitionPagination,
-                                                             cancellationToken)).AnyAsync(cancellationToken)
-                                                                                .ConfigureAwait(false))
-    {
-      await foreach (var (count, partition) in res.WithCancellation(cancellationToken)
-                                                  .ConfigureAwait(false))
-      {
-        if (firstPage)
-        {
-          total     = count;
-          firstPage = false;
-        }
-
-        yield return partition;
-      }
-
-      partitionPagination.Page++;
-    }
-  }
+  /// <returns>A task representing the asynchronous operation. The task result contains a partition page.</returns>
+  Task<PartitionPage> ListPartitionsAsync(PartitionPagination partitionPagination,
+                                          CancellationToken   cancellationToken);
 }
