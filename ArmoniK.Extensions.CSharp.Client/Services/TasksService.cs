@@ -30,7 +30,7 @@ using ArmoniK.Extensions.CSharp.Client.Common.Domain.Task;
 using ArmoniK.Extensions.CSharp.Client.Common.Enum;
 using ArmoniK.Extensions.CSharp.Client.Common.Services;
 using ArmoniK.Extensions.CSharp.Client.Queryable;
-using ArmoniK.Extensions.CSharp.Client.Queryable.TaskStateQuery;
+using ArmoniK.Extensions.CSharp.Client.Queryable.TaskSummaryQuery;
 using ArmoniK.Extensions.CSharp.Common.Common.Domain.Task;
 using ArmoniK.Extensions.CSharp.Common.Library;
 using ArmoniK.Utils;

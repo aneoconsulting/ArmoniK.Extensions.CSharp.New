@@ -20,7 +20,7 @@ using ArmoniK.Api.gRPC.V1.Tasks;
 
 using TaskSummary = ArmoniK.Extensions.CSharp.Client.Common.Domain.Task.TaskSummary;
 
-namespace ArmoniK.Extensions.CSharp.Client.Queryable.TaskStateQuery;
+namespace ArmoniK.Extensions.CSharp.Client.Queryable.TaskSummaryQuery;
 
 /// <summary>
 ///   Specialisation of QueryExpressionTreeVisitor for queries on TaskState instances.

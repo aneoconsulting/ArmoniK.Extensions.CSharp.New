@@ -63,92 +63,6 @@ public class BaseBlobFilterTests
                                                                                           },
                                                                                         };
 
-  private static readonly Dictionary<string, FilterStringOperator> Op2EnumStringOp = new()
-                                                                                     {
-                                                                                       {
-                                                                                         "==", FilterStringOperator.Equal
-                                                                                       },
-                                                                                       {
-                                                                                         "!=", FilterStringOperator.NotEqual
-                                                                                       },
-                                                                                       {
-                                                                                         "Contains", FilterStringOperator.Contains
-                                                                                       },
-                                                                                       {
-                                                                                         "NotContains", FilterStringOperator.NotContains
-                                                                                       },
-                                                                                       {
-                                                                                         "StartsWith", FilterStringOperator.StartsWith
-                                                                                       },
-                                                                                       {
-                                                                                         "EndsWith", FilterStringOperator.EndsWith
-                                                                                       },
-                                                                                     };
-
-  private static readonly Dictionary<string, FilterNumberOperator> Op2EnumIntOp = new()
-                                                                                  {
-                                                                                    {
-                                                                                      "==", FilterNumberOperator.Equal
-                                                                                    },
-                                                                                    {
-                                                                                      "!=", FilterNumberOperator.NotEqual
-                                                                                    },
-                                                                                    {
-                                                                                      "<", FilterNumberOperator.LessThan
-                                                                                    },
-                                                                                    {
-                                                                                      "<=", FilterNumberOperator.LessThanOrEqual
-                                                                                    },
-                                                                                    {
-                                                                                      ">", FilterNumberOperator.GreaterThan
-                                                                                    },
-                                                                                    {
-                                                                                      ">=", FilterNumberOperator.GreaterThanOrEqual
-                                                                                    },
-                                                                                  };
-
-  private static readonly Dictionary<string, FilterStatusOperator> Op2EnumStatusOp = new()
-                                                                                     {
-                                                                                       {
-                                                                                         "==", FilterStatusOperator.Equal
-                                                                                       },
-                                                                                       {
-                                                                                         "!=", FilterStatusOperator.NotEqual
-                                                                                       },
-                                                                                     };
-
-  private static readonly Dictionary<string, FilterDateOperator> Op2EnumDateOp = new()
-                                                                                 {
-                                                                                   {
-                                                                                     "==", FilterDateOperator.Equal
-                                                                                   },
-                                                                                   {
-                                                                                     "!=", FilterDateOperator.NotEqual
-                                                                                   },
-                                                                                   {
-                                                                                     "<", FilterDateOperator.Before
-                                                                                   },
-                                                                                   {
-                                                                                     "<=", FilterDateOperator.BeforeOrEqual
-                                                                                   },
-                                                                                   {
-                                                                                     ">", FilterDateOperator.After
-                                                                                   },
-                                                                                   {
-                                                                                     ">=", FilterDateOperator.AfterOrEqual
-                                                                                   },
-                                                                                 };
-
-  private static readonly Dictionary<string, FilterArrayOperator> Op2EnumArrayOp = new()
-                                                                                   {
-                                                                                     {
-                                                                                       "Contains", FilterArrayOperator.Contains
-                                                                                     },
-                                                                                     {
-                                                                                       "NotContains", FilterArrayOperator.NotContains
-                                                                                     },
-                                                                                   };
-
   protected readonly ListResultsResponse Response = new()
                                                     {
                                                       Results =
@@ -214,7 +128,7 @@ public class BaseBlobFilterTests
          Field = BuildResultField(fieldName),
          FilterString = new FilterString
                         {
-                          Operator = Op2EnumStringOp[op],
+                          Operator = FiltersMaps.Op2EnumStringOp_[op],
                           Value    = value,
                         },
        };
@@ -227,7 +141,7 @@ public class BaseBlobFilterTests
          Field = BuildResultField(fieldName),
          FilterNumber = new FilterNumber
                         {
-                          Operator = Op2EnumIntOp[op],
+                          Operator = FiltersMaps.Op2EnumIntOp_[op],
                           Value    = value,
                         },
        };
@@ -240,7 +154,7 @@ public class BaseBlobFilterTests
          Field = BuildResultField(fieldName),
          FilterStatus = new FilterStatus
                         {
-                          Operator = Op2EnumStatusOp[op],
+                          Operator = FiltersMaps.Op2EnumStatusOp_[op],
                           Value    = value.ToGrpcStatus(),
                         },
        };
@@ -253,7 +167,7 @@ public class BaseBlobFilterTests
          Field = BuildResultField(fieldName),
          FilterDate = new FilterDate
                       {
-                        Operator = Op2EnumDateOp[op],
+                        Operator = FiltersMaps.Op2EnumDateOp_[op],
                         Value = value.ToUniversalTime()
                                      .ToTimestamp(),
                       },
@@ -267,7 +181,7 @@ public class BaseBlobFilterTests
          Field = BuildResultField(fieldName),
          FilterArray = new FilterArray
                        {
-                         Operator = Op2EnumArrayOp[op],
+                         Operator = FiltersMaps.Op2EnumArrayOp_[op],
                          Value    = value.ToString(),
                        },
        };

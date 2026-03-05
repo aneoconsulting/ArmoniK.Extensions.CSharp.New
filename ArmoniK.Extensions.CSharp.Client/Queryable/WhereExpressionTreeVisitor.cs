@@ -23,7 +23,6 @@ using System.Linq.Expressions;
 using System.Reflection;
 
 using ArmoniK.Api.gRPC.V1;
-using ArmoniK.Extension.CSharp.Client.Queryable;
 using ArmoniK.Extensions.CSharp.Common.Common.Domain.Blob;
 using ArmoniK.Extensions.CSharp.Common.Common.Domain.Task;
 

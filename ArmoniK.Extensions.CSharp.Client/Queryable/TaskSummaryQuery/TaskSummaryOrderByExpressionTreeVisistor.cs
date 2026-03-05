@@ -15,64 +15,19 @@
 // limitations under the License.
 
 using System;
-using System.Collections.Generic;
 using System.Data;
 using System.Linq.Expressions;
 
 using ArmoniK.Api.gRPC.V1.Tasks;
-using ArmoniK.Extension.CSharp.Client.Queryable;
 using ArmoniK.Extensions.CSharp.Common.Common.Domain.Task;
 
-namespace ArmoniK.Extensions.CSharp.Client.Queryable.TaskStateQuery;
+namespace ArmoniK.Extensions.CSharp.Client.Queryable.TaskSummaryQuery;
 
 /// <summary>
 ///   Specialisation of OrderByExpressionTreeVisitor for queries on TaskState instances.
 /// </summary>
 internal class TaskSummaryOrderByExpressionTreeVisitor : OrderByExpressionTreeVisitor<TaskField>
 {
-  private static readonly Dictionary<string, TaskSummaryEnumField> MemberName2EnumField_ = new()
-                                                                                           {
-                                                                                             {
-                                                                                               nameof(TaskInfos.TaskId), TaskSummaryEnumField.TaskId
-                                                                                             },
-                                                                                             {
-                                                                                               nameof(TaskInfos.PayloadId), TaskSummaryEnumField.PayloadId
-                                                                                             },
-                                                                                             {
-                                                                                               nameof(TaskInfos.SessionId), TaskSummaryEnumField.SessionId
-                                                                                             },
-                                                                                             {
-                                                                                               nameof(TaskState.CreateAt), TaskSummaryEnumField.CreatedAt
-                                                                                             },
-                                                                                             {
-                                                                                               nameof(TaskState.EndedAt), TaskSummaryEnumField.EndedAt
-                                                                                             },
-                                                                                             {
-                                                                                               nameof(TaskState.StartedAt), TaskSummaryEnumField.StartedAt
-                                                                                             },
-                                                                                             {
-                                                                                               nameof(TaskState.Status), TaskSummaryEnumField.Status
-                                                                                             },
-                                                                                           };
-
-  private static readonly Dictionary<string, TaskOptionEnumField> MemberName2OptionEnumField_ = new()
-                                                                                                {
-                                                                                                  {
-                                                                                                    nameof(TaskConfiguration.MaxDuration),
-                                                                                                    TaskOptionEnumField.MaxDuration
-                                                                                                  },
-                                                                                                  {
-                                                                                                    nameof(TaskConfiguration.MaxRetries), TaskOptionEnumField.MaxRetries
-                                                                                                  },
-                                                                                                  {
-                                                                                                    nameof(TaskConfiguration.PartitionId),
-                                                                                                    TaskOptionEnumField.PartitionId
-                                                                                                  },
-                                                                                                  {
-                                                                                                    nameof(TaskConfiguration.Priority), TaskOptionEnumField.Priority
-                                                                                                  },
-                                                                                                };
-
   public override TaskField Visit(LambdaExpression lambda)
   {
     switch (lambda.Body)
@@ -80,8 +35,8 @@ internal class TaskSummaryOrderByExpressionTreeVisitor : OrderByExpressionTreeVi
       case MemberExpression member:
         if (member.IsLeftMostQualifierAParameter())
         {
-          if (MemberName2EnumField_.TryGetValue(member.Member.Name,
-                                                out var field))
+          if (TaskSummaryMaps.MemberName2EnumField_.TryGetValue(member.Member.Name,
+                                                                out var field))
           {
             return new TaskField
                    {
@@ -92,8 +47,8 @@ internal class TaskSummaryOrderByExpressionTreeVisitor : OrderByExpressionTreeVi
                    };
           }
 
-          if (member.Expression.Type == typeof(TaskConfiguration) && MemberName2OptionEnumField_.TryGetValue(member.Member.Name,
-                                                                                                             out var optionField))
+          if (member.Expression.Type == typeof(TaskConfiguration) && TaskSummaryMaps.MemberName2OptionEnumField_.TryGetValue(member.Member.Name,
+                                                                                                                             out var optionField))
           {
             return new TaskField
                    {

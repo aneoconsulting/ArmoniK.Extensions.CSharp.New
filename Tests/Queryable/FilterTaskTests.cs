@@ -16,7 +16,7 @@
 
 using ArmoniK.Api.gRPC.V1.Tasks;
 using ArmoniK.Extensions.CSharp.Client.Queryable;
-using ArmoniK.Extensions.CSharp.Client.Queryable.TaskStateQuery;
+using ArmoniK.Extensions.CSharp.Client.Queryable.TaskSummaryQuery;
 
 using NUnit.Framework;
 

@@ -83,10 +83,10 @@ public class TaskSummary
 public static class TaskSummaryExt
 {
   /// <summary>
-  ///   Convert a TaskDetailed instance into a TaskState
+  ///   Convert a protobuf TaskSummary instance into a SDK TaskSummary instance
   /// </summary>
-  /// <param name="taskSummary">The TaskDetailed instance</param>
-  /// <returns>The TaskState instance</returns>
+  /// <param name="taskSummary">The protobuf TaskSummary instance</param>
+  /// <returns>The SDK TaskSummary instance</returns>
   public static TaskSummary ToTaskSummary(this Api.gRPC.V1.Tasks.TaskSummary taskSummary)
     => new()
        {

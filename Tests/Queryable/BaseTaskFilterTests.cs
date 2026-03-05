@@ -18,6 +18,7 @@ using ArmoniK.Api.gRPC.V1;
 using ArmoniK.Api.gRPC.V1.Tasks;
 using ArmoniK.Extensions.CSharp.Client.Common.Domain.Task;
 using ArmoniK.Extensions.CSharp.Client.Common.Enum;
+using ArmoniK.Extensions.CSharp.Client.Queryable.TaskSummaryQuery;
 using ArmoniK.Extensions.CSharp.Common.Common.Domain.Task;
 
 using Google.Protobuf.WellKnownTypes;
@@ -28,147 +29,6 @@ namespace Tests.Queryable;
 
 public class BaseTaskFilterTests
 {
-  private static readonly Dictionary<string, TaskSummaryEnumField> MemberName2EnumField_ = new()
-                                                                                           {
-                                                                                             {
-                                                                                               nameof(TaskInfos.TaskId), TaskSummaryEnumField.TaskId
-                                                                                             },
-                                                                                             {
-                                                                                               nameof(TaskInfos.PayloadId), TaskSummaryEnumField.PayloadId
-                                                                                             },
-                                                                                             {
-                                                                                               nameof(TaskInfos.SessionId), TaskSummaryEnumField.SessionId
-                                                                                             },
-                                                                                             {
-                                                                                               nameof(TaskState.CreateAt), TaskSummaryEnumField.CreatedAt
-                                                                                             },
-                                                                                             {
-                                                                                               nameof(TaskState.EndedAt), TaskSummaryEnumField.EndedAt
-                                                                                             },
-                                                                                             {
-                                                                                               nameof(TaskState.StartedAt), TaskSummaryEnumField.StartedAt
-                                                                                             },
-                                                                                             {
-                                                                                               nameof(TaskState.Status), TaskSummaryEnumField.Status
-                                                                                             },
-                                                                                           };
-
-  private static readonly Dictionary<string, TaskOptionEnumField> memberName2OptionEnumField_ = new()
-                                                                                                {
-                                                                                                  {
-                                                                                                    nameof(TaskConfiguration.MaxDuration),
-                                                                                                    TaskOptionEnumField.MaxDuration
-                                                                                                  },
-                                                                                                  {
-                                                                                                    nameof(TaskConfiguration.MaxRetries), TaskOptionEnumField.MaxRetries
-                                                                                                  },
-                                                                                                  {
-                                                                                                    nameof(TaskConfiguration.PartitionId),
-                                                                                                    TaskOptionEnumField.PartitionId
-                                                                                                  },
-                                                                                                  {
-                                                                                                    nameof(TaskConfiguration.Priority), TaskOptionEnumField.Priority
-                                                                                                  },
-                                                                                                };
-
-  private static readonly Dictionary<string, FilterStringOperator> op2EnumStringOp_ = new()
-                                                                                      {
-                                                                                        {
-                                                                                          "==", FilterStringOperator.Equal
-                                                                                        },
-                                                                                        {
-                                                                                          "!=", FilterStringOperator.NotEqual
-                                                                                        },
-                                                                                        {
-                                                                                          "Contains", FilterStringOperator.Contains
-                                                                                        },
-                                                                                        {
-                                                                                          "NotContains", FilterStringOperator.NotContains
-                                                                                        },
-                                                                                        {
-                                                                                          "StartsWith", FilterStringOperator.StartsWith
-                                                                                        },
-                                                                                        {
-                                                                                          "EndsWith", FilterStringOperator.EndsWith
-                                                                                        },
-                                                                                      };
-
-  private static readonly Dictionary<string, FilterNumberOperator> op2EnumIntOp_ = new()
-                                                                                   {
-                                                                                     {
-                                                                                       "==", FilterNumberOperator.Equal
-                                                                                     },
-                                                                                     {
-                                                                                       "!=", FilterNumberOperator.NotEqual
-                                                                                     },
-                                                                                     {
-                                                                                       "<", FilterNumberOperator.LessThan
-                                                                                     },
-                                                                                     {
-                                                                                       "<=", FilterNumberOperator.LessThanOrEqual
-                                                                                     },
-                                                                                     {
-                                                                                       ">", FilterNumberOperator.GreaterThan
-                                                                                     },
-                                                                                     {
-                                                                                       ">=", FilterNumberOperator.GreaterThanOrEqual
-                                                                                     },
-                                                                                   };
-
-  private static readonly Dictionary<string, FilterStatusOperator> op2EnumStatusOp_ = new()
-                                                                                      {
-                                                                                        {
-                                                                                          "==", FilterStatusOperator.Equal
-                                                                                        },
-                                                                                        {
-                                                                                          "!=", FilterStatusOperator.NotEqual
-                                                                                        },
-                                                                                      };
-
-  private static readonly Dictionary<string, FilterDateOperator> op2EnumDateOp_ = new()
-                                                                                  {
-                                                                                    {
-                                                                                      "==", FilterDateOperator.Equal
-                                                                                    },
-                                                                                    {
-                                                                                      "!=", FilterDateOperator.NotEqual
-                                                                                    },
-                                                                                    {
-                                                                                      "<", FilterDateOperator.Before
-                                                                                    },
-                                                                                    {
-                                                                                      "<=", FilterDateOperator.BeforeOrEqual
-                                                                                    },
-                                                                                    {
-                                                                                      ">", FilterDateOperator.After
-                                                                                    },
-                                                                                    {
-                                                                                      ">=", FilterDateOperator.AfterOrEqual
-                                                                                    },
-                                                                                  };
-
-  private static readonly Dictionary<string, FilterDurationOperator> Op2EnumDurationOp_ = new()
-                                                                                          {
-                                                                                            {
-                                                                                              "==", FilterDurationOperator.Equal
-                                                                                            },
-                                                                                            {
-                                                                                              "!=", FilterDurationOperator.NotEqual
-                                                                                            },
-                                                                                            {
-                                                                                              "<", FilterDurationOperator.ShorterThan
-                                                                                            },
-                                                                                            {
-                                                                                              "<=", FilterDurationOperator.ShorterThanOrEqual
-                                                                                            },
-                                                                                            {
-                                                                                              ">", FilterDurationOperator.LongerThan
-                                                                                            },
-                                                                                            {
-                                                                                              ">=", FilterDurationOperator.LongerThanOrEqual
-                                                                                            },
-                                                                                          };
-
   protected TaskPagination BuildTaskPagination(Filters    filter,
                                                TaskField? sortCriteria       = null,
                                                bool       ascendingSort      = true,
@@ -196,7 +56,7 @@ public class BaseTaskFilterTests
        {
          TaskSummaryField = new TaskSummaryField
                             {
-                              Field = MemberName2EnumField_[sortCriteria],
+                              Field = TaskSummaryMaps.MemberName2EnumField_[sortCriteria],
                             },
        };
 
@@ -205,7 +65,7 @@ public class BaseTaskFilterTests
        {
          TaskOptionField = new TaskOptionField
                            {
-                             Field = memberName2OptionEnumField_[sortCriteria],
+                             Field = TaskSummaryMaps.MemberName2OptionEnumField_[sortCriteria],
                            },
        };
 
@@ -232,8 +92,8 @@ public class BaseTaskFilterTests
              };
     }
 
-    if (MemberName2EnumField_.TryGetValue(fieldName,
-                                          out var fieldSummary))
+    if (TaskSummaryMaps.MemberName2EnumField_.TryGetValue(fieldName,
+                                                          out var fieldSummary))
     {
       return new TaskField
              {
@@ -248,7 +108,7 @@ public class BaseTaskFilterTests
            {
              TaskOptionField = new TaskOptionField
                                {
-                                 Field = memberName2OptionEnumField_[fieldName],
+                                 Field = TaskSummaryMaps.MemberName2OptionEnumField_[fieldName],
                                },
            };
   }
@@ -266,7 +126,7 @@ public class BaseTaskFilterTests
                                       elements[1]),
                FilterString = new FilterString
                               {
-                                Operator = op2EnumStringOp_[op],
+                                Operator = FiltersMaps.Op2EnumStringOp_[op],
                                 Value    = value,
                               },
              };
@@ -277,7 +137,7 @@ public class BaseTaskFilterTests
              Field = BuildTaskField(fieldName),
              FilterString = new FilterString
                             {
-                              Operator = op2EnumStringOp_[op],
+                              Operator = FiltersMaps.Op2EnumStringOp_[op],
                               Value    = value,
                             },
            };
@@ -291,7 +151,7 @@ public class BaseTaskFilterTests
          Field = BuildTaskField(fieldName),
          FilterNumber = new FilterNumber
                         {
-                          Operator = op2EnumIntOp_[op],
+                          Operator = FiltersMaps.Op2EnumIntOp_[op],
                           Value    = value,
                         },
        };
@@ -304,7 +164,7 @@ public class BaseTaskFilterTests
          Field = BuildTaskField(fieldName),
          FilterStatus = new FilterStatus
                         {
-                          Operator = op2EnumStatusOp_[op],
+                          Operator = FiltersMaps.Op2EnumStatusOp_[op],
                           Value    = value.ToGrpcStatus(),
                         },
        };
@@ -317,7 +177,7 @@ public class BaseTaskFilterTests
          Field = BuildTaskField(fieldName),
          FilterDate = new FilterDate
                       {
-                        Operator = op2EnumDateOp_[op],
+                        Operator = FiltersMaps.Op2EnumDateOp_[op],
                         Value = value.ToUniversalTime()
                                      .ToTimestamp(),
                       },
@@ -331,7 +191,7 @@ public class BaseTaskFilterTests
          Field = BuildTaskField(fieldName),
          FilterDuration = new FilterDuration
                           {
-                            Operator = Op2EnumDurationOp_[op],
+                            Operator = FiltersMaps.Op2EnumDurationOp_[op],
                             Value    = Duration.FromTimeSpan(value),
                           },
        };

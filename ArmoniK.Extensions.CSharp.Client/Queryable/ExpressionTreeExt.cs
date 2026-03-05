@@ -19,7 +19,7 @@ using System.Data;
 using System.Linq.Expressions;
 using System.Reflection;
 
-namespace ArmoniK.Extension.CSharp.Client.Queryable;
+namespace ArmoniK.Extensions.CSharp.Client.Queryable;
 
 /// <summary>
 ///   Class containing helper extension methods working on Expressions Trees

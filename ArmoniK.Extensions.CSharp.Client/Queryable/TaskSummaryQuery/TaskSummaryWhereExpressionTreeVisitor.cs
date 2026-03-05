@@ -30,96 +30,16 @@ using FilterField = ArmoniK.Api.gRPC.V1.Tasks.FilterField;
 using Filters = ArmoniK.Api.gRPC.V1.Tasks.Filters;
 using FiltersAnd = ArmoniK.Api.gRPC.V1.Tasks.FiltersAnd;
 using FilterStatus = ArmoniK.Api.gRPC.V1.Tasks.FilterStatus;
-using TaskStatus = ArmoniK.Extensions.CSharp.Common.Common.Domain.Task.TaskStatus;
+using TaskStatus = ArmoniK.Api.gRPC.V1.TaskStatus;
 using Type = System.Type;
 
-namespace ArmoniK.Extensions.CSharp.Client.Queryable.TaskStateQuery;
+namespace ArmoniK.Extensions.CSharp.Client.Queryable.TaskSummaryQuery;
 
 /// <summary>
 ///   Specialisation of WhereExpressionTreeVisitor for queries on TaskState instances.
 /// </summary>
 internal class TaskSummaryWhereExpressionTreeVisitor : WhereExpressionTreeVisitor<TaskField, Filters, FiltersAnd, FilterField>
 {
-  private static readonly Dictionary<string, TaskSummaryEnumField> MemberName2EnumField_ = new()
-                                                                                           {
-                                                                                             {
-                                                                                               nameof(TaskInfos.TaskId), TaskSummaryEnumField.TaskId
-                                                                                             },
-                                                                                             {
-                                                                                               nameof(TaskInfos.PayloadId), TaskSummaryEnumField.PayloadId
-                                                                                             },
-                                                                                             {
-                                                                                               nameof(TaskInfos.SessionId), TaskSummaryEnumField.SessionId
-                                                                                             },
-                                                                                             {
-                                                                                               nameof(TaskState.CreateAt), TaskSummaryEnumField.CreatedAt
-                                                                                             },
-                                                                                             {
-                                                                                               nameof(TaskState.EndedAt), TaskSummaryEnumField.EndedAt
-                                                                                             },
-                                                                                             {
-                                                                                               nameof(TaskState.StartedAt), TaskSummaryEnumField.StartedAt
-                                                                                             },
-                                                                                             {
-                                                                                               nameof(TaskState.Status), TaskSummaryEnumField.Status
-                                                                                             },
-                                                                                           };
-
-  private static readonly Dictionary<string, TaskOptionEnumField> MemberName2OptionEnumField_ = new()
-                                                                                                {
-                                                                                                  {
-                                                                                                    nameof(TaskConfiguration.MaxDuration),
-                                                                                                    TaskOptionEnumField.MaxDuration
-                                                                                                  },
-                                                                                                  {
-                                                                                                    nameof(TaskConfiguration.MaxRetries), TaskOptionEnumField.MaxRetries
-                                                                                                  },
-                                                                                                  {
-                                                                                                    nameof(TaskConfiguration.PartitionId),
-                                                                                                    TaskOptionEnumField.PartitionId
-                                                                                                  },
-                                                                                                  {
-                                                                                                    nameof(TaskConfiguration.Priority), TaskOptionEnumField.Priority
-                                                                                                  },
-                                                                                                };
-
-  private static readonly Dictionary<string, Type> MemberName2Type_ = new()
-                                                                      {
-                                                                        {
-                                                                          nameof(TaskInfos.TaskId), typeof(string)
-                                                                        },
-                                                                        {
-                                                                          nameof(TaskInfos.PayloadId), typeof(string)
-                                                                        },
-                                                                        {
-                                                                          nameof(TaskInfos.SessionId), typeof(string)
-                                                                        },
-                                                                        {
-                                                                          nameof(TaskState.CreateAt), typeof(DateTime)
-                                                                        },
-                                                                        {
-                                                                          nameof(TaskState.EndedAt), typeof(DateTime)
-                                                                        },
-                                                                        {
-                                                                          nameof(TaskState.StartedAt), typeof(DateTime)
-                                                                        },
-                                                                        {
-                                                                          nameof(TaskState.Status), typeof(TaskStatus)
-                                                                        },
-                                                                        {
-                                                                          nameof(TaskConfiguration.MaxDuration), typeof(TimeSpan)
-                                                                        },
-                                                                        {
-                                                                          nameof(TaskConfiguration.MaxRetries), typeof(int)
-                                                                        },
-                                                                        {
-                                                                          nameof(TaskConfiguration.PartitionId), typeof(string)
-                                                                        },
-                                                                        {
-                                                                          nameof(TaskConfiguration.Priority), typeof(int)
-                                                                        },
-                                                                      };
-
   protected override Filters CreateFilterOr(params FiltersAnd[] filters)
   {
     var orFilter = new Filters();
@@ -145,9 +65,9 @@ internal class TaskSummaryWhereExpressionTreeVisitor : WhereExpressionTreeVisito
     Type memberType;
     if (member.Expression.Type == typeof(TaskConfiguration))
     {
-      if (MemberName2Type_.TryGetValue(member.Member.Name,
-                                       out memberType) && MemberName2OptionEnumField_.TryGetValue(member.Member.Name,
-                                                                                                  out var enumOptionField))
+      if (TaskSummaryMaps.MemberName2Type_.TryGetValue(member.Member.Name,
+                                                       out memberType) && TaskSummaryMaps.MemberName2OptionEnumField_.TryGetValue(member.Member.Name,
+                                                                                                                                  out var enumOptionField))
       {
         // filter on a property of TaskOption property
         var taskField = new TaskField
@@ -172,9 +92,9 @@ internal class TaskSummaryWhereExpressionTreeVisitor : WhereExpressionTreeVisito
       }
     }
 
-    if (MemberName2Type_.TryGetValue(member.Member.Name,
-                                     out memberType) && MemberName2EnumField_.TryGetValue(member.Member.Name,
-                                                                                          out var enumField))
+    if (TaskSummaryMaps.MemberName2Type_.TryGetValue(member.Member.Name,
+                                                     out memberType) && TaskSummaryMaps.MemberName2EnumField_.TryGetValue(member.Member.Name,
+                                                                                                                          out var enumField))
     {
       var taskField = new TaskField
                       {
@@ -262,9 +182,9 @@ internal class TaskSummaryWhereExpressionTreeVisitor : WhereExpressionTreeVisito
     return filterField;
   }
 
-  protected override FilterField CreateTaskStatusFilter(TaskField              taskField,
-                                                        FilterStatusOperator   op,
-                                                        Api.gRPC.V1.TaskStatus val)
+  protected override FilterField CreateTaskStatusFilter(TaskField            taskField,
+                                                        FilterStatusOperator op,
+                                                        TaskStatus           val)
   {
     var filterField = new FilterField();
     filterField.FilterStatus = new FilterStatus
