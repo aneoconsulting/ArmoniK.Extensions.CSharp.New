@@ -14,8 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-using System.Collections.Generic;
-using System.Runtime.CompilerServices;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -23,6 +22,8 @@ using ArmoniK.Api.gRPC.V1.Partitions;
 using ArmoniK.Api.gRPC.V1.SortDirection;
 using ArmoniK.Extensions.CSharp.Client.Common.Domain.Partition;
 using ArmoniK.Extensions.CSharp.Client.Common.Services;
+using ArmoniK.Extensions.CSharp.Client.Queryable;
+using ArmoniK.Extensions.CSharp.Client.Queryable.PartitionQuery;
 using ArmoniK.Utils.Pool;
 
 using Grpc.Core;
@@ -36,8 +37,9 @@ namespace ArmoniK.Extensions.CSharp.Client.Services;
 /// </summary>
 public class PartitionsService : IPartitionsService
 {
-  private readonly ObjectPool<ChannelBase>    channel_;
-  private readonly ILogger<PartitionsService> logger_;
+  private readonly ObjectPool<ChannelBase>     channel_;
+  private readonly ILogger<PartitionsService>  logger_;
+  private readonly ArmoniKQueryable<Partition> queryable_;
 
   /// <summary>
   ///   Creates an instance of <see cref="PartitionsService" /> using the specified GRPC channel and an optional logger
@@ -56,7 +58,15 @@ public class PartitionsService : IPartitionsService
   {
     logger_  = loggerFactory.CreateLogger<PartitionsService>();
     channel_ = channel;
+
+    var queryProvider = new PartitionQueryProvider(this,
+                                                   logger_);
+    queryable_ = new ArmoniKQueryable<Partition>(queryProvider);
   }
+
+  /// <inheritdoc />
+  public IQueryable<Partition> AsQueryable()
+    => queryable_;
 
   /// <inheritdoc />
   public async Task<Partition> GetPartitionAsync(string            partitionId,
@@ -75,8 +85,8 @@ public class PartitionsService : IPartitionsService
   }
 
   /// <inheritdoc />
-  public async IAsyncEnumerable<(int, Partition)> ListPartitionsAsync(PartitionPagination                        partitionPagination,
-                                                                      [EnumeratorCancellation] CancellationToken cancellationToken)
+  public async Task<PartitionPage> ListPartitionsAsync(PartitionPagination partitionPagination,
+                                                       CancellationToken   cancellationToken)
   {
     await using var channel = await channel_.GetAsync(cancellationToken)
                                             .ConfigureAwait(false);
@@ -88,14 +98,18 @@ public class PartitionsService : IPartitionsService
                                                                   PageSize = partitionPagination.PageSize,
                                                                   Sort = new ListPartitionsRequest.Types.Sort
                                                                          {
+                                                                           Field     = partitionPagination.SortField,
                                                                            Direction = (SortDirection)partitionPagination.SortDirection,
                                                                          },
-                                                                })
+                                                                },
+                                                                cancellationToken: cancellationToken)
                                            .ConfigureAwait(false);
 
-    foreach (var partitionRaw in partitions.Partitions)
-    {
-      yield return (partitions.Total, partitionRaw.ToPartition());
-    }
+    return new PartitionPage
+           {
+             TotalPartitionCount = partitions.Total,
+             Partitions = partitions.Partitions.Select(partitionRaw => partitionRaw.ToPartition())
+                                    .ToArray(),
+           };
   }
 }

@@ -142,7 +142,7 @@ internal class TaskSummaryWhereExpressionTreeVisitor : WhereExpressionTreeVisito
 
   protected override FilterField CreateNumberFilter(TaskField            taskField,
                                                     FilterNumberOperator op,
-                                                    int                  val)
+                                                    long                 val)
   {
     var filterField = new FilterField();
     filterField.FilterNumber = new FilterNumber
@@ -201,6 +201,12 @@ internal class TaskSummaryWhereExpressionTreeVisitor : WhereExpressionTreeVisito
                                                         ResultStatus         val)
     // should never happen since there is no BlobStatus property in TaskState
     => throw new InvalidOperationException("Invalid filter: BlobStatus filter is not supported for TaskState queries.");
+
+  protected override FilterField CreateArrayFilter(TaskField           field,
+                                                   FilterArrayOperator op,
+                                                   string              val)
+    // should never happen since there is no criteria to filter on an array property in TaskState
+    => throw new InvalidOperationException("Invalid filter: array filters are not supported for TaskState queries.");
 
   protected override void OnCollectionContains(TaskField           field,
                                                IEnumerable<object> collection,

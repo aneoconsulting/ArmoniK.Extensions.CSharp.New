@@ -138,7 +138,7 @@ internal class BlobStateWhereExpressionTreeVisitor : WhereExpressionTreeVisitor<
 
   protected override FilterField CreateNumberFilter(ResultField          field,
                                                     FilterNumberOperator op,
-                                                    int                  val)
+                                                    long                 val)
   {
     var filterField = new FilterField();
     filterField.FilterNumber = new FilterNumber
@@ -189,6 +189,12 @@ internal class BlobStateWhereExpressionTreeVisitor : WhereExpressionTreeVisitor<
     filterField.Field = field;
     return filterField;
   }
+
+  protected override FilterField CreateArrayFilter(ResultField         field,
+                                                   FilterArrayOperator op,
+                                                   string              val)
+    // should never happen since there is no criteria to filter on an array property in BlobState
+    => throw new InvalidOperationException("Invalid filter: array filters are not supported for BlobState queries.");
 
   protected override void OnIndexerAccess()
     // That case never happen for BlobState instances and is not supported
