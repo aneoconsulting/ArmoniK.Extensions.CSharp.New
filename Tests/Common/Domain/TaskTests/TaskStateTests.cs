@@ -38,7 +38,7 @@ public class TaskStateTests
                                   TaskStatus.Completed);
     Assert.Multiple(() =>
                     {
-                      Assert.That(taskState.CreateAt,
+                      Assert.That(taskState.CreatedAt,
                                   Is.EqualTo(createAt));
                       Assert.That(taskState.EndedAt,
                                   Is.EqualTo(endedAt));

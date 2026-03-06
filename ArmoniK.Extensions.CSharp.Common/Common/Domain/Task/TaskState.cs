@@ -47,7 +47,7 @@ public record TaskState : TaskInfos
                    DateTime?  startedAt,
                    TaskStatus status)
   {
-    CreateAt  = createAt;
+    CreatedAt = createAt;
     EndedAt   = endedAt;
     StartedAt = startedAt;
     Status    = status;
@@ -61,7 +61,7 @@ public record TaskState : TaskInfos
   /// <summary>
   ///   Time when the task was created.
   /// </summary>
-  public DateTime CreateAt { get; init; }
+  public DateTime CreatedAt { get; init; }
 
   /// <summary>
   ///   The task submission date.
@@ -328,7 +328,7 @@ public static class TaskStateExt
          ExpectedOutputs  = taskDetailed.ExpectedOutputIds,
          TaskId           = taskDetailed.Id,
          Status           = taskDetailed.Status.ToInternalStatus(),
-         CreateAt         = taskDetailed.CreatedAt.ToDateTime(),
+         CreatedAt        = taskDetailed.CreatedAt.ToDateTime(),
          StartedAt        = taskDetailed.StartedAt?.ToDateTime(),
          EndedAt          = taskDetailed.EndedAt?.ToDateTime(),
          SessionId        = taskDetailed.SessionId,

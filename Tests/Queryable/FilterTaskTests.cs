@@ -115,17 +115,236 @@ public class FilterTaskTests : BaseTaskFilterTests
   }
 
   [Test]
-  public void CreateAtFilterEqual()
+  public void CreatedByFilterEqual()
+  {
+    var client = new MockedArmoniKClient();
+
+    var filter = BuildOr(BuildAnd(BuildFilterString("CreatedBy",
+                                                    "==",
+                                                    "task1")));
+
+    var query = client.TasksService.AsQueryable()
+                      .Where(taskState => taskState.CreatedBy == "task1");
+
+    // Execute the query
+    var result = query.AsAsyncEnumerable()
+                      .ToListAsync();
+
+    var taskQueryProvider = (TaskSummaryQueryProvider)((ArmoniKQueryable<TaskSummary>)query).Provider;
+    Assert.That(taskQueryProvider.QueryExecution!.PaginationInstance,
+                Is.EqualTo(BuildTaskPagination(filter)));
+  }
+
+  [Test]
+  public void CreatedAtFilterEqual()
   {
     var client = new MockedArmoniKClient();
 
     var date = DateTime.UtcNow;
-    var filter = BuildOr(BuildAnd(BuildFilterDateTime("CreateAt",
+    var filter = BuildOr(BuildAnd(BuildFilterDateTime("CreatedAt",
                                                       "==",
                                                       date)));
 
     var query = client.TasksService.AsQueryable()
-                      .Where(taskState => taskState.CreateAt == date);
+                      .Where(taskState => taskState.CreatedAt == date);
+
+    // Execute the query
+    var result = query.AsAsyncEnumerable()
+                      .ToListAsync();
+
+    var taskQueryProvider = (TaskSummaryQueryProvider)((ArmoniKQueryable<TaskSummary>)query).Provider;
+    Assert.That(taskQueryProvider.QueryExecution!.PaginationInstance,
+                Is.EqualTo(BuildTaskPagination(filter)));
+  }
+
+  [Test]
+  public void SubmittedAtFilterEqual()
+  {
+    var client = new MockedArmoniKClient();
+
+    var date = DateTime.UtcNow;
+    var filter = BuildOr(BuildAnd(BuildFilterDateTime("SubmittedAt",
+                                                      "==",
+                                                      date)));
+
+    var query = client.TasksService.AsQueryable()
+                      .Where(taskState => taskState.SubmittedAt == date);
+
+    // Execute the query
+    var result = query.AsAsyncEnumerable()
+                      .ToListAsync();
+
+    var taskQueryProvider = (TaskSummaryQueryProvider)((ArmoniKQueryable<TaskSummary>)query).Provider;
+    Assert.That(taskQueryProvider.QueryExecution!.PaginationInstance,
+                Is.EqualTo(BuildTaskPagination(filter)));
+  }
+
+  [Test]
+  public void ReceivedAtFilterEqual()
+  {
+    var client = new MockedArmoniKClient();
+
+    var date = DateTime.UtcNow;
+    var filter = BuildOr(BuildAnd(BuildFilterDateTime("ReceivedAt",
+                                                      "==",
+                                                      date)));
+
+    var query = client.TasksService.AsQueryable()
+                      .Where(taskState => taskState.ReceivedAt == date);
+
+    // Execute the query
+    var result = query.AsAsyncEnumerable()
+                      .ToListAsync();
+
+    var taskQueryProvider = (TaskSummaryQueryProvider)((ArmoniKQueryable<TaskSummary>)query).Provider;
+    Assert.That(taskQueryProvider.QueryExecution!.PaginationInstance,
+                Is.EqualTo(BuildTaskPagination(filter)));
+  }
+
+  [Test]
+  public void AcquiredAtFilterEqual()
+  {
+    var client = new MockedArmoniKClient();
+
+    var date = DateTime.UtcNow;
+    var filter = BuildOr(BuildAnd(BuildFilterDateTime("AcquiredAt",
+                                                      "==",
+                                                      date)));
+
+    var query = client.TasksService.AsQueryable()
+                      .Where(taskState => taskState.AcquiredAt == date);
+
+    // Execute the query
+    var result = query.AsAsyncEnumerable()
+                      .ToListAsync();
+
+    var taskQueryProvider = (TaskSummaryQueryProvider)((ArmoniKQueryable<TaskSummary>)query).Provider;
+    Assert.That(taskQueryProvider.QueryExecution!.PaginationInstance,
+                Is.EqualTo(BuildTaskPagination(filter)));
+  }
+
+  [Test]
+  public void FetchedAtFilterEqual()
+  {
+    var client = new MockedArmoniKClient();
+
+    var date = DateTime.UtcNow;
+    var filter = BuildOr(BuildAnd(BuildFilterDateTime("FetchedAt",
+                                                      "==",
+                                                      date)));
+
+    var query = client.TasksService.AsQueryable()
+                      .Where(taskState => taskState.FetchedAt == date);
+
+    // Execute the query
+    var result = query.AsAsyncEnumerable()
+                      .ToListAsync();
+
+    var taskQueryProvider = (TaskSummaryQueryProvider)((ArmoniKQueryable<TaskSummary>)query).Provider;
+    Assert.That(taskQueryProvider.QueryExecution!.PaginationInstance,
+                Is.EqualTo(BuildTaskPagination(filter)));
+  }
+
+  [Test]
+  public void ProcessedAtFilterEqual()
+  {
+    var client = new MockedArmoniKClient();
+
+    var date = DateTime.UtcNow;
+    var filter = BuildOr(BuildAnd(BuildFilterDateTime("ProcessedAt",
+                                                      "==",
+                                                      date)));
+
+    var query = client.TasksService.AsQueryable()
+                      .Where(taskState => taskState.ProcessedAt == date);
+
+    // Execute the query
+    var result = query.AsAsyncEnumerable()
+                      .ToListAsync();
+
+    var taskQueryProvider = (TaskSummaryQueryProvider)((ArmoniKQueryable<TaskSummary>)query).Provider;
+    Assert.That(taskQueryProvider.QueryExecution!.PaginationInstance,
+                Is.EqualTo(BuildTaskPagination(filter)));
+  }
+
+  [Test]
+  public void PodTtlFilterEqual()
+  {
+    var client = new MockedArmoniKClient();
+
+    var date = DateTime.UtcNow;
+    var filter = BuildOr(BuildAnd(BuildFilterDateTime("PodTTL",
+                                                      "==",
+                                                      date)));
+
+    var query = client.TasksService.AsQueryable()
+                      .Where(taskState => taskState.PodTTL == date);
+
+    // Execute the query
+    var result = query.AsAsyncEnumerable()
+                      .ToListAsync();
+
+    var taskQueryProvider = (TaskSummaryQueryProvider)((ArmoniKQueryable<TaskSummary>)query).Provider;
+    Assert.That(taskQueryProvider.QueryExecution!.PaginationInstance,
+                Is.EqualTo(BuildTaskPagination(filter)));
+  }
+
+  [Test]
+  public void CreationToEndFilterEqual()
+  {
+    var client = new MockedArmoniKClient();
+
+    var duration = TimeSpan.FromMinutes(30);
+    var filter = BuildOr(BuildAnd(BuildFilterDuration("CreationToEnd",
+                                                      "==",
+                                                      duration)));
+
+    var query = client.TasksService.AsQueryable()
+                      .Where(taskState => taskState.CreationToEnd == duration);
+
+    // Execute the query
+    var result = query.AsAsyncEnumerable()
+                      .ToListAsync();
+
+    var taskQueryProvider = (TaskSummaryQueryProvider)((ArmoniKQueryable<TaskSummary>)query).Provider;
+    Assert.That(taskQueryProvider.QueryExecution!.PaginationInstance,
+                Is.EqualTo(BuildTaskPagination(filter)));
+  }
+
+  [Test]
+  public void ProcessingToEndFilterEqual()
+  {
+    var client = new MockedArmoniKClient();
+
+    var duration = TimeSpan.FromMinutes(30);
+    var filter = BuildOr(BuildAnd(BuildFilterDuration("ProcessingToEnd",
+                                                      "==",
+                                                      duration)));
+
+    var query = client.TasksService.AsQueryable()
+                      .Where(taskState => taskState.ProcessingToEnd == duration);
+
+    // Execute the query
+    var result = query.AsAsyncEnumerable()
+                      .ToListAsync();
+
+    var taskQueryProvider = (TaskSummaryQueryProvider)((ArmoniKQueryable<TaskSummary>)query).Provider;
+    Assert.That(taskQueryProvider.QueryExecution!.PaginationInstance,
+                Is.EqualTo(BuildTaskPagination(filter)));
+  }
+
+  [Test]
+  public void ReceivedToEndFilterEqual()
+  {
+    var client = new MockedArmoniKClient();
+
+    var duration = TimeSpan.FromMinutes(30);
+    var filter = BuildOr(BuildAnd(BuildFilterDuration("ReceivedToEnd",
+                                                      "==",
+                                                      duration)));
+
+    var query = client.TasksService.AsQueryable()
+                      .Where(taskState => taskState.ReceivedToEnd == duration);
 
     // Execute the query
     var result = query.AsAsyncEnumerable()
@@ -191,6 +410,69 @@ public class FilterTaskTests : BaseTaskFilterTests
 
     var query = client.TasksService.AsQueryable()
                       .Where(taskState => taskState.Status == TaskStatus.Error);
+
+    // Execute the query
+    var result = query.AsAsyncEnumerable()
+                      .ToListAsync();
+
+    var taskQueryProvider = (TaskSummaryQueryProvider)((ArmoniKQueryable<TaskSummary>)query).Provider;
+    Assert.That(taskQueryProvider.QueryExecution!.PaginationInstance,
+                Is.EqualTo(BuildTaskPagination(filter)));
+  }
+
+  [Test]
+  public void OwnerPodIdFilterEqual()
+  {
+    var client = new MockedArmoniKClient();
+
+    var filter = BuildOr(BuildAnd(BuildFilterString("OwnerPodId",
+                                                    "==",
+                                                    "pod1")));
+
+    var query = client.TasksService.AsQueryable()
+                      .Where(taskState => taskState.OwnerPodId == "pod1");
+
+    // Execute the query
+    var result = query.AsAsyncEnumerable()
+                      .ToListAsync();
+
+    var taskQueryProvider = (TaskSummaryQueryProvider)((ArmoniKQueryable<TaskSummary>)query).Provider;
+    Assert.That(taskQueryProvider.QueryExecution!.PaginationInstance,
+                Is.EqualTo(BuildTaskPagination(filter)));
+  }
+
+  [Test]
+  public void PodHostNameFilterEqual()
+  {
+    var client = new MockedArmoniKClient();
+
+    var filter = BuildOr(BuildAnd(BuildFilterString("PodHostName",
+                                                    "==",
+                                                    "myhost")));
+
+    var query = client.TasksService.AsQueryable()
+                      .Where(taskState => taskState.PodHostName == "myhost");
+
+    // Execute the query
+    var result = query.AsAsyncEnumerable()
+                      .ToListAsync();
+
+    var taskQueryProvider = (TaskSummaryQueryProvider)((ArmoniKQueryable<TaskSummary>)query).Provider;
+    Assert.That(taskQueryProvider.QueryExecution!.PaginationInstance,
+                Is.EqualTo(BuildTaskPagination(filter)));
+  }
+
+  [Test]
+  public void InitialTaskIdFilterEqual()
+  {
+    var client = new MockedArmoniKClient();
+
+    var filter = BuildOr(BuildAnd(BuildFilterString("InitialTaskId",
+                                                    "==",
+                                                    "initialTask")));
+
+    var query = client.TasksService.AsQueryable()
+                      .Where(taskState => taskState.InitialTaskId == "initialTask");
 
     // Execute the query
     var result = query.AsAsyncEnumerable()
