@@ -29,7 +29,7 @@ internal class PartitionQueryExpressionTreeVisitor : QueryExpressionTreeVisitor<
 
   public PartitionQueryExpressionTreeVisitor()
   {
-    // By default the requests are ordered by BlobId in ascending order
+    // By default the requests are ordered by PartitionId in ascending order
     SortCriteria = new PartitionField
                    {
                      PartitionRawField = new PartitionRawField

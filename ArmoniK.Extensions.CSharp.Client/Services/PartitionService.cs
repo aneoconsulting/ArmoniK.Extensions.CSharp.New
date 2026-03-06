@@ -98,10 +98,11 @@ public class PartitionsService : IPartitionsService
                                                                   PageSize = partitionPagination.PageSize,
                                                                   Sort = new ListPartitionsRequest.Types.Sort
                                                                          {
-                                                                            Field = partitionPagination.SortField,
-                                                                            Direction = (SortDirection)partitionPagination.SortDirection,
+                                                                           Field     = partitionPagination.SortField,
+                                                                           Direction = (SortDirection)partitionPagination.SortDirection,
                                                                          },
-                                                                })
+                                                                },
+                                                                cancellationToken: cancellationToken)
                                            .ConfigureAwait(false);
 
     return new PartitionPage

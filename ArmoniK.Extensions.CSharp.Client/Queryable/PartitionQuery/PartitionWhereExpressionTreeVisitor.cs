@@ -20,12 +20,9 @@ using System.Linq.Expressions;
 
 using ArmoniK.Api.gRPC.V1;
 using ArmoniK.Api.gRPC.V1.Partitions;
-using ArmoniK.Extensions.CSharp.Client.Common.Domain.Partition;
 
 using Google.Protobuf.Collections;
 using Google.Protobuf.WellKnownTypes;
-
-using Type = System.Type;
 
 namespace ArmoniK.Extensions.CSharp.Client.Queryable.PartitionQuery;
 
@@ -178,8 +175,8 @@ internal class PartitionWhereExpressionTreeVisitor : WhereExpressionTreeVisitor<
   protected override bool PushProperty(MemberExpression member)
   {
     if (PartitionMaps.MemberName2Type_.TryGetValue(member.Member.Name,
-                                     out var memberType) && PartitionMaps.MemberName2EnumField_.TryGetValue(member.Member.Name,
-                                                                                              out var enumField))
+                                                   out var memberType) && PartitionMaps.MemberName2EnumField_.TryGetValue(member.Member.Name,
+                                                                                                                          out var enumField))
     {
       var field = new PartitionField
                   {

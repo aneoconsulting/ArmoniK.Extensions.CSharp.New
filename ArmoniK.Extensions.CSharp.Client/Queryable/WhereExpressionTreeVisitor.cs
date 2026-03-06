@@ -138,8 +138,8 @@ internal abstract class WhereExpressionTreeVisitor<TField, TFilterOr, TFilterAnd
   {
     if (node is MethodCallExpression call)
     {
-      var hasParameterQualifier = call.Object!.IsLeftMostQualifierAParameter();
-      var typeName              = call.Method.DeclaringType?.FullName ?? "";
+      var hasParameterQualifier = call.Object?.IsLeftMostQualifierAParameter() ?? false;
+      var typeName              = call.Method.DeclaringType?.FullName          ?? "";
       if (call.Method.Name == nameof(string.StartsWith) && typeName == "System.String" && hasParameterQualifier)
       {
         if (call.Arguments.Count != 1)
@@ -227,12 +227,29 @@ internal abstract class WhereExpressionTreeVisitor<TField, TFilterOr, TFilterAnd
             throw new InvalidExpressionException("Invalid filter: Contains method overload not supported.");
           }
 
-          Visit(call.Arguments[0]);
-          Visit(call.Arguments[1]);
+          if (call.Arguments[1]
+                  .IsLeftMostQualifierAParameter())
+          {
+            // filter of the form : collection.Contains(<lambda parameter>)
+            Visit(call.Arguments[0]);
+            Visit(call.Arguments[1]);
 
-          VisitContainsMethod(call,
-                              notOp);
-          return;
+            VisitContainsMethod(call,
+                                notOp);
+            return;
+          }
+
+          if (call.Arguments[0]
+                  .IsLeftMostQualifierAParameter())
+          {
+            // filter of the form : <lambda parameter>.Contains(expression)
+            // with lambda parameter being enumerable.
+            Visit(call.Arguments[0]);
+            Visit(call.Arguments[1]);
+
+            PushArrayFilter(notOp);
+            return;
+          }
         }
       }
 
@@ -1060,9 +1077,9 @@ internal abstract class WhereExpressionTreeVisitor<TField, TFilterOr, TFilterAnd
       val = number;
       constCount++;
     }
-    else if (rhsFilter is long number2)
+    else if (lhsFilter is long number2)
     {
-      // Right hand side is a constant
+      // Left hand side is a constant
       val = number2;
       constCount++;
     }

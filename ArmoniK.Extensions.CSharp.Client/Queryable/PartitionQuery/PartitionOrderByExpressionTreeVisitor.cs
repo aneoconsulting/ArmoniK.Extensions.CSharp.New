@@ -15,12 +15,10 @@
 // limitations under the License.
 
 using System;
-using System.Collections.Generic;
 using System.Data;
 using System.Linq.Expressions;
 
 using ArmoniK.Api.gRPC.V1.Partitions;
-using ArmoniK.Extensions.CSharp.Client.Common.Domain.Partition;
 
 namespace ArmoniK.Extensions.CSharp.Client.Queryable.PartitionQuery;
 
@@ -34,7 +32,7 @@ internal class PartitionOrderByExpressionTreeVisitor : OrderByExpressionTreeVisi
     if (lambda.Body is MemberExpression member)
     {
       if (PartitionMaps.MemberName2EnumField_.TryGetValue(member.Member.Name,
-                                            out var field))
+                                                          out var field))
       {
         return new PartitionField
                {

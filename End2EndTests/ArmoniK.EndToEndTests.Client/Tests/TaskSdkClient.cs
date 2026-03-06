@@ -132,11 +132,15 @@ public class TaskSdkClient : ClientBase
   [Test]
   public async Task PartitionQuery()
   {
-    var partition1 = Client!.PartitionsService.AsQueryable().Where(partition => partition.PartitionId == Partition).First();
-    var partition2 = Client!.PartitionsService.AsQueryable().Where(partition => partition.PartitionId == Partition).FirstOrDefault();
+    var partition1 = Client!.PartitionsService.AsQueryable()
+                            .Where(partition => partition.PartitionId == Partition)
+                            .First();
+    var partition2 = Client!.PartitionsService.AsQueryable()
+                            .Where(partition => partition.PartitionId == Partition)
+                            .FirstOrDefault();
 
     Assert.Multiple(() =>
-                        {
+                    {
                       Assert.That(partition1.PartitionId,
                                   Is.EqualTo(Partition));
                       Assert.That(partition2!.PartitionId,

@@ -14,8 +14,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-using System.Collections.Immutable;
-
 using ArmoniK.Extensions.CSharp.Client.Common.Domain.Partition;
 
 using NUnit.Framework;
@@ -40,7 +38,7 @@ public class PartitionTests
     var partition = new Partition
                     {
                       PartitionId        = "partition1",
-                      ParentPartitionIds = parentPartitionIds.ToImmutableArray(),
+                      ParentPartitionIds = parentPartitionIds,
                       PodConfiguration = podConfiguration.ToDictionary(pair => pair.Key,
                                                                        pair => pair.Value),
                       PodMax               = 100,
@@ -80,7 +78,7 @@ public class PartitionTests
     var partition1 = new Partition
                      {
                        PartitionId        = "partition1",
-                       ParentPartitionIds = parentPartitionIds.ToImmutableArray(),
+                       ParentPartitionIds = parentPartitionIds,
                        PodConfiguration = podConfiguration.ToDictionary(pair => pair.Key,
                                                                         pair => pair.Value),
                        PodMax               = 100,
@@ -92,7 +90,7 @@ public class PartitionTests
     var partition2 = new Partition
                      {
                        PartitionId        = "partition1",
-                       ParentPartitionIds = parentPartitionIds.ToImmutableArray(),
+                       ParentPartitionIds = parentPartitionIds,
                        PodConfiguration = podConfiguration.ToDictionary(pair => pair.Key,
                                                                         pair => pair.Value),
                        PodMax               = 100,
@@ -120,7 +118,7 @@ public class PartitionTests
     var partition1 = new Partition
                      {
                        PartitionId        = "partition1",
-                       ParentPartitionIds = parentPartitionIds1.ToImmutableArray(),
+                       ParentPartitionIds = parentPartitionIds1,
                        PodConfiguration = podConfiguration1.ToDictionary(pair => pair.Key,
                                                                          pair => pair.Value),
                        PodMax               = 100,
@@ -145,7 +143,7 @@ public class PartitionTests
     var partition2 = new Partition
                      {
                        PartitionId        = "partition2",
-                       ParentPartitionIds = parentPartitionIds2.ToImmutableArray(),
+                       ParentPartitionIds = parentPartitionIds2,
                        PodConfiguration = podConfiguration2.ToDictionary(pair => pair.Key,
                                                                          pair => pair.Value),
                        PodMax               = 200,

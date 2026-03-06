@@ -37,12 +37,12 @@ public record Partition
   /// <summary>
   ///   Collection of identifiers for parent partitions.
   /// </summary>
-  public ImmutableArray<string> ParentPartitionIds { get; init; } = ImmutableArray<string>.Empty;
+  public IReadOnlyCollection<string> ParentPartitionIds { get; init; } = ImmutableArray<string>.Empty;
 
   /// <summary>
   ///   Configuration settings for pods within the partition, represented as key-value pairs.
   /// </summary>
-  public IReadOnlyDictionary<string, string> PodConfiguration { get; init; } = new Dictionary<string, string>();
+  public IReadOnlyDictionary<string, string> PodConfiguration { get; init; } = ImmutableDictionary<string, string>.Empty;
 
   /// <summary>
   ///   Maximum number of pods that can be allocated to this partition.
@@ -125,7 +125,7 @@ public static class PartitionExt
     => new()
        {
          PartitionId        = partitionRaw.Id,
-         ParentPartitionIds = partitionRaw.ParentPartitionIds.ToImmutableArray(),
+         ParentPartitionIds = partitionRaw.ParentPartitionIds,
          PodConfiguration = partitionRaw.PodConfiguration.ToDictionary(pair => pair.Key,
                                                                        pair => pair.Value),
          PodMax               = partitionRaw.PodMax,
