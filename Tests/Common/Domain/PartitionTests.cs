@@ -52,7 +52,7 @@ public class PartitionTests
     Assert.That(partition.ParentPartitionIds,
                 Is.EqualTo(parentPartitionIds));
     Assert.That(partition.PodConfiguration,
-                Is.EqualTo(podConfiguration));
+                Is.EquivalentTo(podConfiguration));
     Assert.That(partition.PodMax,
                 Is.EqualTo(100));
     Assert.That(partition.PodReserved,
