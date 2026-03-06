@@ -20,6 +20,8 @@ using System.Collections.Generic;
 using ArmoniK.Api.gRPC.V1.Tasks;
 using ArmoniK.Extensions.CSharp.Common.Common.Domain.Task;
 
+using TaskSummary = ArmoniK.Extensions.CSharp.Client.Common.Domain.Task.TaskSummary;
+
 namespace ArmoniK.Extensions.CSharp.Client.Queryable.TaskSummaryQuery;
 
 internal static class TaskSummaryMaps
@@ -27,25 +29,67 @@ internal static class TaskSummaryMaps
   public static readonly Dictionary<string, TaskSummaryEnumField> MemberName2EnumField_ = new()
                                                                                           {
                                                                                             {
-                                                                                              nameof(TaskInfos.TaskId), TaskSummaryEnumField.TaskId
+                                                                                              nameof(TaskSummary.TaskId), TaskSummaryEnumField.TaskId
                                                                                             },
                                                                                             {
-                                                                                              nameof(TaskInfos.PayloadId), TaskSummaryEnumField.PayloadId
+                                                                                              nameof(TaskSummary.PayloadId), TaskSummaryEnumField.PayloadId
                                                                                             },
                                                                                             {
-                                                                                              nameof(TaskInfos.SessionId), TaskSummaryEnumField.SessionId
+                                                                                              nameof(TaskSummary.SessionId), TaskSummaryEnumField.SessionId
                                                                                             },
                                                                                             {
-                                                                                              nameof(TaskState.CreateAt), TaskSummaryEnumField.CreatedAt
+                                                                                              nameof(TaskSummary.CreatedBy), TaskSummaryEnumField.CreatedBy
                                                                                             },
                                                                                             {
-                                                                                              nameof(TaskState.EndedAt), TaskSummaryEnumField.EndedAt
+                                                                                              nameof(TaskSummary.CreatedAt), TaskSummaryEnumField.CreatedAt
                                                                                             },
                                                                                             {
-                                                                                              nameof(TaskState.StartedAt), TaskSummaryEnumField.StartedAt
+                                                                                              nameof(TaskSummary.SubmittedAt), TaskSummaryEnumField.SubmittedAt
                                                                                             },
                                                                                             {
-                                                                                              nameof(TaskState.Status), TaskSummaryEnumField.Status
+                                                                                              nameof(TaskSummary.AcquiredAt), TaskSummaryEnumField.AcquiredAt
+                                                                                            },
+                                                                                            {
+                                                                                              nameof(TaskSummary.FetchedAt), TaskSummaryEnumField.FetchedAt
+                                                                                            },
+                                                                                            {
+                                                                                              nameof(TaskSummary.ProcessedAt), TaskSummaryEnumField.ProcessedAt
+                                                                                            },
+                                                                                            {
+                                                                                              nameof(TaskSummary.PodTTL), TaskSummaryEnumField.PodTtl
+                                                                                            },
+                                                                                            {
+                                                                                              nameof(TaskSummary.ReceivedAt), TaskSummaryEnumField.ReceivedAt
+                                                                                            },
+                                                                                            {
+                                                                                              nameof(TaskSummary.EndedAt), TaskSummaryEnumField.EndedAt
+                                                                                            },
+                                                                                            {
+                                                                                              nameof(TaskSummary.StartedAt), TaskSummaryEnumField.StartedAt
+                                                                                            },
+                                                                                            {
+                                                                                              nameof(TaskSummary.CreationToEnd),
+                                                                                              TaskSummaryEnumField.CreationToEndDuration
+                                                                                            },
+                                                                                            {
+                                                                                              nameof(TaskSummary.ProcessingToEnd),
+                                                                                              TaskSummaryEnumField.ProcessingToEndDuration
+                                                                                            },
+                                                                                            {
+                                                                                              nameof(TaskSummary.ReceivedToEnd),
+                                                                                              TaskSummaryEnumField.ReceivedToEndDuration
+                                                                                            },
+                                                                                            {
+                                                                                              nameof(TaskSummary.Status), TaskSummaryEnumField.Status
+                                                                                            },
+                                                                                            {
+                                                                                              nameof(TaskSummary.OwnerPodId), TaskSummaryEnumField.OwnerPodId
+                                                                                            },
+                                                                                            {
+                                                                                              nameof(TaskSummary.PodHostName), TaskSummaryEnumField.PodHostname
+                                                                                            },
+                                                                                            {
+                                                                                              nameof(TaskSummary.InitialTaskId), TaskSummaryEnumField.InitialTaskId
                                                                                             },
                                                                                           };
 
@@ -68,25 +112,64 @@ internal static class TaskSummaryMaps
   public static readonly Dictionary<string, Type> MemberName2Type_ = new()
                                                                      {
                                                                        {
-                                                                         nameof(TaskInfos.TaskId), typeof(string)
+                                                                         nameof(TaskSummary.TaskId), typeof(string)
                                                                        },
                                                                        {
-                                                                         nameof(TaskInfos.PayloadId), typeof(string)
+                                                                         nameof(TaskSummary.PayloadId), typeof(string)
                                                                        },
                                                                        {
-                                                                         nameof(TaskInfos.SessionId), typeof(string)
+                                                                         nameof(TaskSummary.SessionId), typeof(string)
                                                                        },
                                                                        {
-                                                                         nameof(TaskState.CreateAt), typeof(DateTime)
+                                                                         nameof(TaskSummary.CreatedBy), typeof(string)
                                                                        },
                                                                        {
-                                                                         nameof(TaskState.EndedAt), typeof(DateTime)
+                                                                         nameof(TaskSummary.CreatedAt), typeof(DateTime)
                                                                        },
                                                                        {
-                                                                         nameof(TaskState.StartedAt), typeof(DateTime)
+                                                                         nameof(TaskSummary.SubmittedAt), typeof(DateTime)
                                                                        },
                                                                        {
-                                                                         nameof(TaskState.Status), typeof(TaskStatus)
+                                                                         nameof(TaskSummary.AcquiredAt), typeof(DateTime)
+                                                                       },
+                                                                       {
+                                                                         nameof(TaskSummary.FetchedAt), typeof(DateTime)
+                                                                       },
+                                                                       {
+                                                                         nameof(TaskSummary.ProcessedAt), typeof(DateTime)
+                                                                       },
+                                                                       {
+                                                                         nameof(TaskSummary.PodTTL), typeof(DateTime)
+                                                                       },
+                                                                       {
+                                                                         nameof(TaskSummary.ReceivedAt), typeof(DateTime)
+                                                                       },
+                                                                       {
+                                                                         nameof(TaskSummary.EndedAt), typeof(DateTime)
+                                                                       },
+                                                                       {
+                                                                         nameof(TaskSummary.StartedAt), typeof(DateTime)
+                                                                       },
+                                                                       {
+                                                                         nameof(TaskSummary.CreationToEnd), typeof(TimeSpan)
+                                                                       },
+                                                                       {
+                                                                         nameof(TaskSummary.ProcessingToEnd), typeof(TimeSpan)
+                                                                       },
+                                                                       {
+                                                                         nameof(TaskSummary.ReceivedToEnd), typeof(TimeSpan)
+                                                                       },
+                                                                       {
+                                                                         nameof(TaskSummary.Status), typeof(TaskStatus)
+                                                                       },
+                                                                       {
+                                                                         nameof(TaskSummary.OwnerPodId), typeof(string)
+                                                                       },
+                                                                       {
+                                                                         nameof(TaskSummary.PodHostName), typeof(string)
+                                                                       },
+                                                                       {
+                                                                         nameof(TaskSummary.InitialTaskId), typeof(string)
                                                                        },
                                                                        {
                                                                          nameof(TaskConfiguration.MaxDuration), typeof(TimeSpan)

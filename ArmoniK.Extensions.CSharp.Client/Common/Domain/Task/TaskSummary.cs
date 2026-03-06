@@ -57,9 +57,44 @@ public class TaskSummary
   public TaskConfiguration TaskOptions { get; set; } = new();
 
   /// <summary>
+  ///   The ID of the Task that as submitted this task if any.
+  /// </summary>
+  public string? CreatedBy { get; init; } = string.Empty;
+
+  /// <summary>
   ///   Time when the task was created.
   /// </summary>
-  public DateTime CreateAt { get; init; }
+  public DateTime CreatedAt { get; init; }
+
+  /// <summary>
+  ///   The task submission date.
+  /// </summary>
+  public DateTime SubmittedAt { get; init; }
+
+  /// <summary>
+  ///   When the task is received by the agent.
+  /// </summary>
+  public DateTime? ReceivedAt { get; init; }
+
+  /// <summary>
+  ///   When the task is acquired by the agent.
+  /// </summary>
+  public DateTime? AcquiredAt { get; init; }
+
+  /// <summary>
+  ///   Task data retrieval end date.
+  /// </summary>
+  public DateTime? FetchedAt { get; init; }
+
+  /// <summary>
+  ///   The end of task processing date.
+  /// </summary>
+  public DateTime? ProcessedAt { get; init; }
+
+  /// <summary>
+  ///   The pod Time To Live.
+  /// </summary>
+  public DateTime? PodTTL { get; init; }
 
   /// <summary>
   ///   Time when the task ended.
@@ -72,9 +107,39 @@ public class TaskSummary
   public DateTime? StartedAt { get; init; }
 
   /// <summary>
+  ///   The task duration. Between the creation date and the end date.
+  /// </summary>
+  public TimeSpan? CreationToEnd { get; init; }
+
+  /// <summary>
+  ///   The task calculated duration. Between the start date and the end date.
+  /// </summary>
+  public TimeSpan? ProcessingToEnd { get; init; }
+
+  /// <summary>
+  ///   The task calculated duration. Between the received date and the end date.
+  /// </summary>
+  public TimeSpan? ReceivedToEnd { get; init; }
+
+  /// <summary>
   ///   Current status of the task.
   /// </summary>
   public TaskStatus Status { get; init; }
+
+  /// <summary>
+  ///   The owner pod ID.
+  /// </summary>
+  public string OwnerPodId { get; init; } = string.Empty;
+
+  /// <summary>
+  ///   The hostname of the container running the task.
+  /// </summary>
+  public string PodHostName { get; init; } = string.Empty;
+
+  /// <summary>
+  ///   The initial task ID. Set when a task is submitted independently of retries.
+  /// </summary>
+  public string InitialTaskId { get; init; } = string.Empty;
 }
 
 /// <summary>
@@ -94,10 +159,23 @@ public static class TaskSummaryExt
          ExpectedOutputsCount  = taskSummary.CountExpectedOutputIds,
          TaskId                = taskSummary.Id,
          Status                = taskSummary.Status.ToInternalStatus(),
-         CreateAt              = taskSummary.CreatedAt.ToDateTime(),
+         CreatedBy             = taskSummary.CreatedBy,
+         CreatedAt             = taskSummary.CreatedAt.ToDateTime(),
+         SubmittedAt           = taskSummary.SubmittedAt.ToDateTime(),
+         ReceivedAt            = taskSummary.ReceivedAt?.ToDateTime(),
+         AcquiredAt            = taskSummary.AcquiredAt?.ToDateTime(),
+         FetchedAt             = taskSummary.FetchedAt?.ToDateTime(),
+         ProcessedAt           = taskSummary.ProcessedAt?.ToDateTime(),
+         PodTTL                = taskSummary.PodTtl?.ToDateTime(),
          StartedAt             = taskSummary.StartedAt?.ToDateTime(),
+         CreationToEnd         = taskSummary.CreationToEndDuration?.ToTimeSpan(),
+         ProcessingToEnd       = taskSummary.ProcessingToEndDuration?.ToTimeSpan(),
+         ReceivedToEnd         = taskSummary.ReceivedToEndDuration?.ToTimeSpan(),
          EndedAt               = taskSummary.EndedAt?.ToDateTime(),
          SessionId             = taskSummary.SessionId,
          PayloadId             = taskSummary.PayloadId,
+         OwnerPodId            = taskSummary.OwnerPodId,
+         PodHostName           = taskSummary.PodHostname,
+         InitialTaskId         = taskSummary.InitialTaskId,
        };
 }
