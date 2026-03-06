@@ -19,8 +19,8 @@ using System.Text.Json;
 
 using ArmoniK.Api.gRPC.V1;
 using ArmoniK.Api.Worker.Worker;
+using ArmoniK.Extensions.CSharp.Common.Common.Domain.Task;
 using ArmoniK.Extensions.CSharp.Common.Exceptions;
-using ArmoniK.Extensions.CSharp.Worker.Common.Domain.Task;
 using ArmoniK.Extensions.CSharp.Worker.Interfaces;
 using ArmoniK.Extensions.CSharp.Worker.Interfaces.Handles;
 

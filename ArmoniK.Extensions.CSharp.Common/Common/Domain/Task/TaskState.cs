@@ -15,6 +15,7 @@
 // limitations under the License.
 
 using System;
+using System.Collections.Generic;
 
 using ArmoniK.Api.gRPC.V1.Tasks;
 
@@ -53,9 +54,44 @@ public record TaskState : TaskInfos
   }
 
   /// <summary>
+  ///   The ID of the Task that as submitted this task if any.
+  /// </summary>
+  public string? CreatedBy { get; init; } = string.Empty;
+
+  /// <summary>
   ///   Time when the task was created.
   /// </summary>
   public DateTime CreateAt { get; init; }
+
+  /// <summary>
+  ///   The task submission date.
+  /// </summary>
+  public DateTime SubmittedAt { get; init; }
+
+  /// <summary>
+  ///   When the task is received by the agent.
+  /// </summary>
+  public DateTime? ReceivedAt { get; init; }
+
+  /// <summary>
+  ///   When the task is acquired by the agent.
+  /// </summary>
+  public DateTime? AcquiredAt { get; init; }
+
+  /// <summary>
+  ///   Task data retrieval end date.
+  /// </summary>
+  public DateTime? FetchedAt { get; init; }
+
+  /// <summary>
+  ///   The end of task processing date.
+  /// </summary>
+  public DateTime? ProcessedAt { get; init; }
+
+  /// <summary>
+  ///   The pod Time To Live.
+  /// </summary>
+  public DateTime? PodTTL { get; init; }
 
   /// <summary>
   ///   Time when the task ended.
@@ -68,9 +104,59 @@ public record TaskState : TaskInfos
   public DateTime? StartedAt { get; init; }
 
   /// <summary>
+  ///   The task duration. Between the creation date and the end date.
+  /// </summary>
+  public TimeSpan? CreationToEnd { get; init; }
+
+  /// <summary>
+  ///   The task calculated duration. Between the start date and the end date.
+  /// </summary>
+  public TimeSpan? ProcessingToEnd { get; init; }
+
+  /// <summary>
+  ///   The task calculated duration. Between the received date and the end date.
+  /// </summary>
+  public TimeSpan? ReceivedToEnd { get; init; }
+
+  /// <summary>
   ///   Current status of the task.
   /// </summary>
   public TaskStatus Status { get; init; }
+
+  /// <summary>
+  ///   The status message.
+  /// </summary>
+  public string StatusMessage { get; init; } = string.Empty;
+
+  /// <summary>
+  ///   The owner pod ID.
+  /// </summary>
+  public string OwnerPodId { get; init; } = string.Empty;
+
+  /// <summary>
+  ///   The hostname of the container running the task.
+  /// </summary>
+  public string PodHostName { get; init; } = string.Empty;
+
+  /// <summary>
+  ///   The initial task ID. Set when a task is submitted independently of retries.
+  /// </summary>
+  public string InitialTaskId { get; init; } = string.Empty;
+
+  /// <summary>
+  ///   The parent task IDs. A tasks can be a child of another task.
+  /// </summary>
+  public IReadOnlyCollection<string> ParentTaskIds { get; init; } = [];
+
+  /// <summary>
+  ///   The retry of IDs. When a task fail, retry will use these set of IDs.
+  /// </summary>
+  public IReadOnlyCollection<string> RetryOfIds { get; init; } = [];
+
+  /// <summary>
+  ///   The task output.
+  /// </summary>
+  public TaskResult? Output { get; init; }
 }
 
 /// <summary>
@@ -247,5 +333,28 @@ public static class TaskStateExt
          EndedAt          = taskDetailed.EndedAt?.ToDateTime(),
          SessionId        = taskDetailed.SessionId,
          PayloadId        = taskDetailed.PayloadId,
+         SubmittedAt      = taskDetailed.SubmittedAt.ToDateTime(),
+         AcquiredAt       = taskDetailed.AcquiredAt?.ToDateTime(),
+         ReceivedAt       = taskDetailed.ReceivedAt?.ToDateTime(),
+         FetchedAt        = taskDetailed.FetchedAt?.ToDateTime(),
+         ProcessedAt      = taskDetailed.ProcessedAt?.ToDateTime(),
+         PodTTL           = taskDetailed.PodTtl?.ToDateTime(),
+         OwnerPodId       = taskDetailed.OwnerPodId,
+         PodHostName      = taskDetailed.PodHostname,
+         InitialTaskId    = taskDetailed.InitialTaskId,
+         ParentTaskIds    = taskDetailed.ParentTaskIds,
+         RetryOfIds       = taskDetailed.RetryOfIds,
+         CreatedBy        = taskDetailed.CreatedBy,
+         CreationToEnd    = taskDetailed.CreationToEndDuration?.ToTimeSpan(),
+         ProcessingToEnd  = taskDetailed.ProcessingToEndDuration?.ToTimeSpan(),
+         ReceivedToEnd    = taskDetailed.ReceivedToEndDuration?.ToTimeSpan(),
+         StatusMessage    = taskDetailed.StatusMessage,
+         TaskOptions      = taskDetailed.Options.ToTaskConfiguration(),
+         Output = taskDetailed.Output?.Success switch
+                  {
+                    null  => null,
+                    true  => TaskResult.Success,
+                    false => TaskResult.Failure(taskDetailed.Output.Error),
+                  },
        };
 }

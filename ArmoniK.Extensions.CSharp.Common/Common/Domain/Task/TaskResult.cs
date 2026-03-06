@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-namespace ArmoniK.Extensions.CSharp.Worker.Interfaces.Common.Domain.Task;
+namespace ArmoniK.Extensions.CSharp.Common.Common.Domain.Task;
 
 /// <summary>
 ///   Represent an ArmoniK task result
