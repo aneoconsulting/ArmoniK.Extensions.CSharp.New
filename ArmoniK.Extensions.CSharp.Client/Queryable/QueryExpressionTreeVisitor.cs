@@ -37,17 +37,17 @@ internal abstract class QueryExpressionTreeVisitor<TSource, TField, TFilterOr, T
   where TFilterOr : new()
   where TFilterAnd : new()
 {
-  /// <summary>
-  ///   Not null when an extension method retuning TSource? has been applied
-  ///   on the IQueryable instance.
-  /// </summary>
-  public Func<IAsyncEnumerable<TSource>, TSource?>? FuncReturnNullableTSource { get; private set; }
+  public const int MAX_PAGE_SIZE = 1000;
 
   /// <summary>
-  ///   Not null when an extension method retuning TSource has been applied
-  ///   on the IQueryable instance.
+  ///   Succession of methods which need to be applied successively on the result of the query.
   /// </summary>
-  public Func<IAsyncEnumerable<TSource>, TSource>? FuncReturnTSource { get; private set; }
+  public List<ExtensionMethod> ExtensionMethods { get; } = new();
+
+  /// <summary>
+  ///   Final method applied on the result of the request which returns a scalar object
+  /// </summary>
+  public Func<IAsyncEnumerable<TSource>, object?>? FunctionReturningScalar { get; private set; }
 
   public TFilterOr? Filters { get; private set; } = new();
 
@@ -58,11 +58,11 @@ internal abstract class QueryExpressionTreeVisitor<TSource, TField, TFilterOr, T
 
   public bool IsSortAscending { get; protected set; }
 
-  public int? PageSize { get; protected set; }
+  public int? PageSize  { get; protected set; }
+  public int? PageIndex { get; protected set; }
 
-  protected abstract bool                                                                    IsWhereExpressionTreeVisitorInstantiated { get; }
-  protected abstract WhereExpressionTreeVisitor<TField, TFilterOr, TFilterAnd, TFilterField> WhereExpressionTreeVisitor               { get; }
-  protected abstract OrderByExpressionTreeVisitor<TField>                                    OrderByWhereExpressionTreeVisitor        { get; }
+  protected abstract WhereExpressionTreeVisitor<TField, TFilterOr, TFilterAnd, TFilterField> WhereExpressionTreeVisitor        { get; }
+  protected abstract OrderByExpressionTreeVisitor<TField>                                    OrderByWhereExpressionTreeVisitor { get; }
 
   /// <summary>
   ///   Visits and analyzes the provided expression tree.
@@ -71,7 +71,8 @@ internal abstract class QueryExpressionTreeVisitor<TSource, TField, TFilterOr, T
   public void VisitTree(Expression tree)
   {
     VisitTreeInternal(tree);
-    if (IsWhereExpressionTreeVisitorInstantiated)
+    PrepareMethods();
+    if (WhereExpressionTreeVisitor.Visited)
     {
       // A Where() was found
       Filters = WhereExpressionTreeVisitor.GetFilterOrRootNode();
@@ -103,7 +104,6 @@ internal abstract class QueryExpressionTreeVisitor<TSource, TField, TFilterOr, T
         else if (thisType == typeof(ArmoniKQueryable<TSource>))
         {
           // This is the leftmost element of the LINQ query, it represents the entire collection.
-          // Nothing to do here.
         }
         else
         {
@@ -113,11 +113,15 @@ internal abstract class QueryExpressionTreeVisitor<TSource, TField, TFilterOr, T
 
         if (call.Method.ReturnType == typeof(IQueryable<TSource>))
         {
-          HandleIQueryableOfTElementExpression(call);
+          HandleIQueryableOfTSourceExpression(call);
         }
         else if (call.Method.ReturnType == typeof(TSource))
         {
-          HandleTElementExpression(call);
+          HandleTSourceExpression(call);
+        }
+        else if (call.Method.ReturnType == typeof(bool))
+        {
+          HandleBoolExpression(call);
         }
         else if (call.Method.Name.StartsWith(nameof(System.Linq.Queryable.OrderBy)))
         {
@@ -133,10 +137,10 @@ internal abstract class QueryExpressionTreeVisitor<TSource, TField, TFilterOr, T
         }
         else if (!HandleMethodCallExpression(call))
         {
+          // IQueryable<TResult> Select<TSource, TResult>(this IQueryable<TSource> source, Expression<Func<TSource, int, TResult>> selector)
+          // IQueryable<TResult> Select<TSource, TResult>(this IQueryable<TSource> source, Expression<Func<TSource, TResult>> selector)
           // IQueryable<TResult> OfType<TResult>(this IQueryable source)
           // IQueryable<TResult> Cast<TResult>(this IQueryable source)
-          // IQueryable<TResult> Select<TSource, TResult>(this IQueryable<TSource> source, Expression<Func<TSource, TResult>> selector)
-          // IQueryable<TResult> Select<TSource, TResult>(this IQueryable<TSource> source, Expression<Func<TSource, int, TResult>> selector)
           // IQueryable<TResult> SelectMany<TSource, TResult>(this IQueryable<TSource> source, Expression<Func<TSource, IEnumerable<TResult>>> selector)
           // IQueryable<TResult> SelectMany<TSource, TResult>(this IQueryable<TSource> source, Expression<Func<TSource, int, IEnumerable<TResult>>> selector)
           // IQueryable<TResult> SelectMany<TSource, TCollection, TResult>(this IQueryable<TSource> source, Expression<Func<TSource, int, IEnumerable<TCollection>>> collectionSelector, Expression<Func<TSource, TCollection, TResult>> resultSelector)
@@ -155,13 +159,6 @@ internal abstract class QueryExpressionTreeVisitor<TSource, TField, TFilterOr, T
           // IQueryable<IGrouping<TKey, TElement>> GroupBy<TSource, TKey, TElement>(this IQueryable<TSource> source, Expression<Func<TSource, TKey>> keySelector, Expression<Func<TSource, TElement>> elementSelector, IEqualityComparer<TKey> comparer)
           // IQueryable<(TFirst First, TSecond Second)> Zip<TFirst, TSecond>(this IQueryable<TFirst> source1, IEnumerable<TSecond> source2)
           // IQueryable<TResult> Zip<TFirst, TSecond, TResult>(this IQueryable<TFirst> source1, IEnumerable<TSecond> source2, Expression<Func<TFirst, TSecond, TResult>> resultSelector)
-          // bool Contains<TSource>(this IQueryable<TSource> source, TSource item)
-          // bool Contains<TSource>(this IQueryable<TSource> source, TSource item, IEqualityComparer<TSource> comparer)
-          // bool SequenceEqual<TSource>(this IQueryable<TSource> source1, IEnumerable<TSource> source2)
-          // bool SequenceEqual<TSource>(this IQueryable<TSource> source1, IEnumerable<TSource> source2, IEqualityComparer<TSource> comparer)
-          // bool Any<TSource>(this IQueryable<TSource> source)
-          // bool Any<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, bool>> predicate)
-          // bool All<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, bool>> predicate)
           // int Count<TSource>(this IQueryable<TSource> source)
           // int Count<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, bool>> predicate)
           // long LongCount<TSource>(this IQueryable<TSource> source)
@@ -190,13 +187,90 @@ internal abstract class QueryExpressionTreeVisitor<TSource, TField, TFilterOr, T
           // decimal? Average<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, decimal?>> selector)
           // TAccumulate Aggregate<TSource, TAccumulate>(this IQueryable<TSource> source, TAccumulate seed, Expression<Func<TAccumulate, TSource, TAccumulate>> func)
           // TResult Aggregate<TSource, TAccumulate, TResult>(this IQueryable<TSource> source, TAccumulate seed, Expression<Func<TAccumulate, TSource, TAccumulate>> func, Expression<Func<TAccumulate, TResult>> selector)
-          throw new NotImplementedException();
+          throw new
+            InvalidOperationException($"Extension method IQueryable<{typeof(TSource).Name}>.{call.Method.Name} is not supported. Please use the enumerable alternative instead.");
         }
       }
     }
   }
 
-  private void HandleTElementExpression(MethodCallExpression call)
+  private void HandleBoolExpression(MethodCallExpression call)
+  {
+    if (call.Method.Name == nameof(System.Linq.Queryable.Contains))
+    {
+      var item = (TSource)call.Arguments[1]
+                              .EvaluateExpression()!;
+      if (call.Arguments.Count == 2)
+      {
+        // bool Contains<TSource>(this IQueryable<TSource> source, TSource item)
+        FunctionReturningScalar = enumerable => enumerable.ContainsAsync(item)
+                                                          .WaitSync();
+      }
+      else
+      {
+        // bool Contains<TSource>(this IQueryable<TSource> source, TSource item, IEqualityComparer<TSource> comparer)
+        var comparer = (IEqualityComparer<TSource>)call.Arguments[2]
+                                                       .EvaluateExpression()!;
+        FunctionReturningScalar = enumerable => enumerable.ContainsAsync(item,
+                                                                         comparer)
+                                                          .WaitSync();
+      }
+    }
+    else if (call.Method.Name == nameof(System.Linq.Queryable.SequenceEqual))
+    {
+      var source2 = (IEnumerable<TSource>)call.Arguments[1]
+                                              .EvaluateExpression()!;
+      if (call.Arguments.Count == 2)
+      {
+        // bool SequenceEqual<TSource>(this IQueryable<TSource> source1, IEnumerable<TSource> source2)
+        FunctionReturningScalar = enumerable => enumerable.SequenceEqualAsync(source2.ToAsyncEnumerable())
+                                                          .WaitSync();
+      }
+      else
+      {
+        // bool SequenceEqual<TSource>(this IQueryable<TSource> source1, IEnumerable<TSource> source2, IEqualityComparer<TSource> comparer)
+        var comparer = (IEqualityComparer<TSource>)call.Arguments[2]
+                                                       .EvaluateExpression()!;
+        FunctionReturningScalar = enumerable => enumerable.SequenceEqualAsync(source2.ToAsyncEnumerable(),
+                                                                              comparer)
+                                                          .WaitSync();
+      }
+    }
+    else if (call.Method.Name == nameof(System.Linq.Queryable.Any))
+    {
+      if (call.Arguments.Count == 1)
+      {
+        // bool Any<TSource>(this IQueryable<TSource> source)
+        FunctionReturningScalar = enumerable => enumerable.AnyAsync()
+                                                          .WaitSync();
+      }
+      else
+      {
+        // bool Any<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, bool>> predicate)
+        var expression = (UnaryExpression)call.Arguments[1];
+        var lambda     = (LambdaExpression)expression.Operand;
+        var func       = (Func<TSource, bool>)lambda.EvaluateExpression()!;
+        FunctionReturningScalar = enumerable => enumerable.AnyAsync(func)
+                                                          .WaitSync();
+      }
+    }
+    else if (call.Method.Name == nameof(System.Linq.Queryable.All))
+    {
+      // bool All<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, bool>> predicate)
+      var expression = (UnaryExpression)call.Arguments[1];
+      var lambda     = (LambdaExpression)expression.Operand;
+      var func       = (Func<TSource, bool>)lambda.EvaluateExpression()!;
+      FunctionReturningScalar = enumerable => enumerable.AllAsync(func)
+                                                        .WaitSync();
+    }
+    else
+    {
+      throw new
+        InvalidOperationException($"Extension method IQueryable<{typeof(TSource).Name}>.{call.Method.Name} is not supported. Please use the enumerable alternative instead.");
+    }
+  }
+
+  private void HandleTSourceExpression(MethodCallExpression call)
   {
     if (call.Method.Name.StartsWith(nameof(System.Linq.Queryable.First)))
     {
@@ -212,56 +286,106 @@ internal abstract class QueryExpressionTreeVisitor<TSource, TField, TFilterOr, T
         // TSource FirstOrDefault<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, bool>> predicate)
         var expression = (UnaryExpression)call.Arguments[1];
         var lambda     = (LambdaExpression)expression.Operand;
-        WhereExpressionTreeVisitor.Visit(lambda);
+        ExtensionMethods.Add(new WhereMethod(WhereExpressionTreeVisitor,
+                                             lambda));
       }
 
-      if (call.Method.Name == nameof(System.Linq.Queryable.FirstOrDefault))
+      FunctionReturningScalar = call.Method.Name == nameof(System.Linq.Queryable.FirstOrDefault)
+                                  ? enumerable => enumerable.FirstOrDefaultAsync()
+                                                            .WaitSync()
+                                  : enumerable => enumerable.FirstAsync()
+                                                            .WaitSync();
+    }
+    else if (call.Method.Name.StartsWith(nameof(System.Linq.Queryable.Last)))
+    {
+      if (call.Arguments.Count == 1)
       {
-        FuncReturnNullableTSource = queryable => queryable.FirstOrDefaultAsync()
+        // TSource Last<TSource>(this IQueryable<TSource> source)
+        // TSource LastOrDefault<TSource>(this IQueryable<TSource> source)
+        // Nothing to do here.
+      }
+      else
+      {
+        // TSource Last<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, bool>> predicate)
+        // TSource LastOrDefault<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, bool>> predicate)
+        var expression = (UnaryExpression)call.Arguments[1];
+        var lambda     = (LambdaExpression)expression.Operand;
+        ExtensionMethods.Add(new WhereMethod(WhereExpressionTreeVisitor,
+                                             lambda));
+      }
+
+      FunctionReturningScalar = call.Method.Name == nameof(System.Linq.Queryable.LastOrDefault)
+                                  ? enumerable => enumerable.LastOrDefaultAsync()
+                                                            .WaitSync()
+                                  : enumerable => enumerable.LastAsync()
+                                                            .WaitSync();
+    }
+    else if (call.Method.Name.StartsWith(nameof(System.Linq.Queryable.Single)))
+    {
+      if (call.Arguments.Count == 1)
+      {
+        // TSource Single<TSource>(this IQueryable<TSource> source)
+        // TSource SingleOrDefault<TSource>(this IQueryable<TSource> source)
+        // Nothing to do here.
+      }
+      else
+      {
+        // TSource Single<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, bool>> predicate)
+        // TSource SingleOrDefault<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, bool>> predicate)
+        var expression = (UnaryExpression)call.Arguments[1];
+        var lambda     = (LambdaExpression)expression.Operand;
+        ExtensionMethods.Add(new WhereMethod(WhereExpressionTreeVisitor,
+                                             lambda));
+      }
+
+      FunctionReturningScalar = call.Method.Name == nameof(System.Linq.Queryable.SingleOrDefault)
+                                  ? enumerable => enumerable.SingleOrDefaultAsync()
+                                                            .WaitSync()
+                                  : enumerable => enumerable.SingleAsync()
+                                                            .WaitSync();
+    }
+    else if (call.Method.Name.StartsWith(nameof(System.Linq.Queryable.ElementAt)))
+    {
+      // TSource ElementAt<TSource>(this IQueryable<TSource> source, int index)
+      // TSource ElementAtOrDefault<TSource>(this IQueryable<TSource> source, int index)
+      var index = (int?)call.Arguments[1]
+                            .EvaluateExpression();
+      if (call.Method.Name == nameof(System.Linq.Queryable.ElementAt))
+      {
+        FunctionReturningScalar = enumerable => enumerable.ElementAtAsync(index!.Value)
                                                           .WaitSync();
       }
       else
       {
-        FuncReturnTSource = queryable => queryable.FirstAsync()
-                                                  .WaitSync();
+        FunctionReturningScalar = enumerable => enumerable.ElementAtOrDefaultAsync(index!.Value)
+                                                          .WaitSync();
       }
+    }
+    else if (call.Method.Name == nameof(System.Linq.Queryable.Aggregate))
+    {
+      // TSource Aggregate<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, TSource, TSource>> func)
+      var expression = (UnaryExpression)call.Arguments[1];
+      var func       = (Func<TSource, TSource, TSource>)expression.Operand.EvaluateExpression()!;
+      FunctionReturningScalar = enumerable => enumerable.AggregateAsync(func)
+                                                        .WaitSync();
     }
     else
     {
-      // TSource Last<TSource>(this IQueryable<TSource> source)
-      // TSource Last<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, bool>> predicate)
-      // TSource LastOrDefault<TSource>(this IQueryable<TSource> source)
-      // TSource LastOrDefault<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, bool>> predicate)
-      // TSource Single<TSource>(this IQueryable<TSource> source)
-      // TSource Single<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, bool>> predicate)
-      // TSource SingleOrDefault<TSource>(this IQueryable<TSource> source)
-      // TSource SingleOrDefault<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, bool>> predicate)
-      // TSource ElementAt<TSource>(this IQueryable<TSource> source, int index)
-      // TSource ElementAtOrDefault<TSource>(this IQueryable<TSource> source, int index)
-      // TSource Aggregate<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, TSource, TSource>> func)
       // TSource Min<TSource>(this IQueryable<TSource> source)
       // TSource Max<TSource>(this IQueryable<TSource> source)
-      throw new NotImplementedException();
+      throw new
+        InvalidOperationException($"Extension method IQueryable<{typeof(TSource).Name}>.{call.Method.Name} is not supported. Please use the enumerable alternative instead.");
     }
   }
 
-  private void HandleIQueryableOfTElementExpression(MethodCallExpression call)
+  private void HandleIQueryableOfTSourceExpression(MethodCallExpression call)
   {
     if (call.Method.Name == nameof(System.Linq.Queryable.Where))
     {
       var expression = (UnaryExpression)call.Arguments[1];
       var lambda     = (LambdaExpression)expression.Operand;
-      if (lambda.Parameters.Count == 1)
-      {
-        // IQueryable<TSource> Where<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, bool>> predicate)
-        WhereExpressionTreeVisitor.Visit(lambda);
-      }
-      else
-      {
-        // IQueryable<TSource> Where<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, int, bool>> predicate)
-        var typename = typeof(TSource).Name;
-        throw new InvalidOperationException("Expression not supported. Please consult documentation." + Environment.NewLine + "Expression is: " + call);
-      }
+      ExtensionMethods.Add(new WhereMethod(WhereExpressionTreeVisitor,
+                                           lambda));
     }
     else if (call.Method.Name == nameof(QueryableExt.WithPageSize))
     {
@@ -269,31 +393,272 @@ internal abstract class QueryExpressionTreeVisitor<TSource, TField, TFilterOr, T
       var expression = (ConstantExpression)call.Arguments[1];
       PageSize = (int)expression.Value;
     }
-    else
+    else if (call.Method.Name == nameof(System.Linq.Queryable.Skip))
     {
       // IQueryable<TSource> Skip<TSource>(this IQueryable<TSource> source, int count)
+      var count = ((int?)call.Arguments[1]
+                             .EvaluateExpression())!.Value;
+      ExtensionMethods.Add(new SkipMethod(count));
+    }
+    else if (call.Method.Name == nameof(System.Linq.Queryable.Take))
+    {
       // IQueryable<TSource> Take<TSource>(this IQueryable<TSource> source, int count)
+      var count = ((int?)call.Arguments[1]
+                             .EvaluateExpression())!.Value;
+      ExtensionMethods.Add(new TakeMethod(count));
+    }
+    else if (call.Method.Name == nameof(System.Linq.Queryable.TakeWhile))
+    {
       // IQueryable<TSource> TakeWhile<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, bool>> predicate)
       // IQueryable<TSource> TakeWhile<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, int, bool>> predicate)
+      var expression = (UnaryExpression)call.Arguments[1];
+      var lambda     = (LambdaExpression)expression.Operand;
+      if (lambda.Parameters.Count == 1)
+      {
+        var func = (Func<TSource, bool>)lambda.EvaluateExpression()!;
+        ExtensionMethods.Add(new SimpleExtensionMethod(enumerable => enumerable.TakeWhile(func)));
+      }
+      else
+      {
+        var func = (Func<TSource, int, bool>)lambda.EvaluateExpression()!;
+        ExtensionMethods.Add(new SimpleExtensionMethod(enumerable => enumerable.TakeWhile(func)));
+      }
+    }
+    else if (call.Method.Name == nameof(System.Linq.Queryable.SkipWhile))
+    {
       // IQueryable<TSource> SkipWhile<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, bool>> predicate)
       // IQueryable<TSource> SkipWhile<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, int, bool>> predicate)
+      var expression = (UnaryExpression)call.Arguments[1];
+      var lambda     = (LambdaExpression)expression.Operand;
+      if (lambda.Parameters.Count == 1)
+      {
+        var func = (Func<TSource, bool>)lambda.EvaluateExpression()!;
+        ExtensionMethods.Add(new SimpleExtensionMethod(enumerable => enumerable.SkipWhile(func)));
+      }
+      else
+      {
+        var func = (Func<TSource, int, bool>)lambda.EvaluateExpression()!;
+        ExtensionMethods.Add(new SimpleExtensionMethod(enumerable => enumerable.SkipWhile(func)));
+      }
+    }
+    else if (call.Method.Name == nameof(System.Linq.Queryable.Distinct))
+    {
       // IQueryable<TSource> Distinct<TSource>(this IQueryable<TSource> source)
       // IQueryable<TSource> Distinct<TSource>(this IQueryable<TSource> source, IEqualityComparer<TSource> comparer)
+      if (call.Arguments.Count == 1)
+      {
+        ExtensionMethods.Add(new SimpleExtensionMethod(enumerable => enumerable.Distinct()));
+      }
+      else
+      {
+        var comparer = (IEqualityComparer<TSource>)call.Arguments[1]
+                                                       .EvaluateExpression()!;
+        ExtensionMethods.Add(new SimpleExtensionMethod(enumerable => enumerable.Distinct(comparer)));
+      }
+    }
+    else if (call.Method.Name == nameof(System.Linq.Queryable.Concat))
+    {
       // IQueryable<TSource> Concat<TSource>(this IQueryable<TSource> source1, IEnumerable<TSource> source2)
+      var source2 = (IEnumerable<TSource>)call.Arguments[1]
+                                              .EvaluateExpression()!;
+      ExtensionMethods.Add(new SimpleExtensionMethod(enumerable => enumerable.Concat(source2.ToAsyncEnumerable())));
+    }
+    else if (call.Method.Name == nameof(System.Linq.Queryable.Union))
+    {
       // IQueryable<TSource> Union<TSource>(this IQueryable<TSource> source1, IEnumerable<TSource> source2)
       // IQueryable<TSource> Union<TSource>(this IQueryable<TSource> source1, IEnumerable<TSource> source2, IEqualityComparer<TSource> comparer)
+      var source2 = (IEnumerable<TSource>)call.Arguments[1]
+                                              .EvaluateExpression()!;
+      if (call.Arguments.Count == 2)
+      {
+        ExtensionMethods.Add(new SimpleExtensionMethod(enumerable => enumerable.Union(source2.ToAsyncEnumerable())));
+      }
+      else
+      {
+        var comparer = (IEqualityComparer<TSource>)call.Arguments[2]
+                                                       .EvaluateExpression()!;
+        ExtensionMethods.Add(new SimpleExtensionMethod(enumerable => enumerable.Union(source2.ToAsyncEnumerable(),
+                                                                                      comparer)));
+      }
+    }
+    else if (call.Method.Name == nameof(System.Linq.Queryable.Intersect))
+    {
       // IQueryable<TSource> Intersect<TSource>(this IQueryable<TSource> source1, IEnumerable<TSource> source2)
       // IQueryable<TSource> Intersect<TSource>(this IQueryable<TSource> source1, IEnumerable<TSource> source2, IEqualityComparer<TSource> comparer)
+      var source2 = (IEnumerable<TSource>)call.Arguments[1]
+                                              .EvaluateExpression()!;
+      if (call.Arguments.Count == 2)
+      {
+        ExtensionMethods.Add(new SimpleExtensionMethod(enumerable => enumerable.Intersect(source2.ToAsyncEnumerable())));
+      }
+      else
+      {
+        var comparer = (IEqualityComparer<TSource>)call.Arguments[1]
+                                                       .EvaluateExpression()!;
+        ExtensionMethods.Add(new SimpleExtensionMethod(enumerable => enumerable.Intersect(source2.ToAsyncEnumerable(),
+                                                                                          comparer)));
+      }
+    }
+    else if (call.Method.Name == nameof(System.Linq.Queryable.Except))
+    {
       // IQueryable<TSource> Except<TSource>(this IQueryable<TSource> source1, IEnumerable<TSource> source2)
       // IQueryable<TSource> Except<TSource>(this IQueryable<TSource> source1, IEnumerable<TSource> source2, IEqualityComparer<TSource> comparer)
+      var source2 = (IEnumerable<TSource>)call.Arguments[1]
+                                              .EvaluateExpression()!;
+      if (call.Arguments.Count == 2)
+      {
+        ExtensionMethods.Add(new SimpleExtensionMethod(enumerable => enumerable.Except(source2.ToAsyncEnumerable())));
+      }
+      else
+      {
+        var comparer = (IEqualityComparer<TSource>)call.Arguments[1]
+                                                       .EvaluateExpression()!;
+        ExtensionMethods.Add(new SimpleExtensionMethod(enumerable => enumerable.Except(source2.ToAsyncEnumerable(),
+                                                                                       comparer)));
+      }
+    }
+    else if (call.Method.Name == nameof(System.Linq.Queryable.DefaultIfEmpty))
+    {
       // IQueryable<TSource> DefaultIfEmpty<TSource>(this IQueryable<TSource> source)
       // IQueryable<TSource> DefaultIfEmpty<TSource>(this IQueryable<TSource> source, TSource defaultValue)
+      if (call.Arguments.Count == 1)
+      {
+        ExtensionMethods.Add(new SimpleExtensionMethod(enumerable => enumerable.DefaultIfEmpty()!));
+      }
+      else
+      {
+        var value = (TSource)call.Arguments[1]
+                                 .EvaluateExpression()!;
+        ExtensionMethods.Add(new SimpleExtensionMethod(enumerable => enumerable.DefaultIfEmpty(value)));
+      }
+    }
+    else if (call.Method.Name == nameof(System.Linq.Queryable.Reverse))
+    {
       // IQueryable<TSource> Reverse<TSource>(this IQueryable<TSource> source)
-      // IQueryable<TSource> SkipLast<TSource>(this IQueryable<TSource> source, int count)
-      // IQueryable<TSource> TakeLast<TSource>(this IQueryable<TSource> source, int count)
-      // IQueryable<TSource> Append<TSource>(this IQueryable<TSource> source, TSource element)
-      // IQueryable<TSource> Prepend<TSource>(this IQueryable<TSource> source, TSource element)
-      throw new NotImplementedException();
+      ExtensionMethods.Add(new SimpleExtensionMethod(enumerable => enumerable.Reverse()));
+    }
+    else
+    {
+      // IQueryable<TSource> Concat<TSource>(this IQueryable<TSource> source1, IEnumerable<TSource> source2)
+      throw new
+        InvalidOperationException($"Extension method IQueryable<{typeof(TSource).Name}>.{call.Method.Name} is not supported. Please use the enumerable alternative instead.");
+    }
+  }
+
+  /// <summary>
+  ///   Executes the extension methods on the result of the gRPC request
+  /// </summary>
+  /// <param name="source">The result of the gRPC request</param>
+  /// <returns>The final result</returns>
+  public IAsyncEnumerable<TSource> RunAllExtensionsMethods(IAsyncEnumerable<TSource> source)
+  {
+    foreach (var method in ExtensionMethods)
+    {
+      if (method.Function != null)
+      {
+        source = method.Function(source);
+      }
+    }
+
+    return source;
+  }
+
+  /// <summary>
+  ///   Prepare the requests
+  /// </summary>
+  public void PrepareMethods()
+  {
+    if (!PageSize.HasValue)
+    {
+      PageSize = MAX_PAGE_SIZE;
+    }
+
+    ExtensionMethod? previous = null;
+    foreach (var method in ExtensionMethods)
+    {
+      if (previous is SkipMethod skipMethod && method is TakeMethod takeMethod && takeMethod.Count > 0 && skipMethod.Count >= takeMethod.Count)
+      {
+        if (skipMethod.Count % takeMethod.Count == 0 && takeMethod.Count == PageSize)
+        {
+          PageIndex = skipMethod.Count / takeMethod.Count;
+        }
+      }
+
+      method.Prepare(previous);
+      previous = method;
+    }
+  }
+
+  internal abstract class ExtensionMethod
+  {
+    public Func<IAsyncEnumerable<TSource>, IAsyncEnumerable<TSource>>? Function { get; protected set; }
+
+    public virtual void Prepare(ExtensionMethod? previous)
+    {
+    }
+  }
+
+  private class SimpleExtensionMethod : ExtensionMethod
+  {
+    public SimpleExtensionMethod(Func<IAsyncEnumerable<TSource>, IAsyncEnumerable<TSource>> func)
+      => Function = func;
+  }
+
+  private class SkipMethod : ExtensionMethod
+  {
+    public SkipMethod(int count)
+    {
+      Function = enumeration => enumeration.Skip(count);
+      Count    = count;
+    }
+
+    public int Count { get; }
+  }
+
+  private class TakeMethod : ExtensionMethod
+  {
+    public TakeMethod(int count)
+    {
+      Function = enumeration => enumeration.Take(count);
+      Count    = count;
+    }
+
+    public int Count { get; }
+  }
+
+  private class WhereMethod : ExtensionMethod
+  {
+    private readonly LambdaExpression                                                        lambda_;
+    private readonly WhereExpressionTreeVisitor<TField, TFilterOr, TFilterAnd, TFilterField> whereVisitor_;
+
+    public WhereMethod(WhereExpressionTreeVisitor<TField, TFilterOr, TFilterAnd, TFilterField> visitor,
+                       LambdaExpression                                                        lambda)
+    {
+      whereVisitor_ = visitor;
+      lambda_       = lambda;
+    }
+
+    public override void Prepare(ExtensionMethod? previous)
+    {
+      if (lambda_.Parameters.Count == 1)
+      {
+        // IQueryable<TSource> Where<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, bool>> predicate)
+        if (previous?.Function == null)
+        {
+          whereVisitor_.Visit(lambda_);
+        }
+        else
+        {
+          var func = (Func<TSource, bool>)lambda_.EvaluateExpression()!;
+          Function = enumerable => enumerable.Where(func);
+        }
+      }
+      else
+      {
+        // IQueryable<TSource> Where<TSource>(this IQueryable<TSource> source, Expression<Func<TSource, int, bool>> predicate)
+        var func = (Func<TSource, int, bool>)lambda_.EvaluateExpression()!;
+        Function = enumeration => enumeration.Where(func);
+      }
     }
   }
 }

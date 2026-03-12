@@ -77,7 +77,8 @@ public class TasksService : ITasksService
 
     var queryProvider = new TaskSummaryQueryProvider(this,
                                                      logger_);
-    queryable_ = new ArmoniKQueryable<TaskSummary>(queryProvider);
+    queryable_ = new ArmoniKQueryable<TaskSummary>(queryProvider,
+                                                   logger_);
   }
 
   /// <inheritdoc />

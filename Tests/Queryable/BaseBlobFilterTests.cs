@@ -91,12 +91,14 @@ public class BaseBlobFilterTests
 
   protected BlobPagination BuildBlobPagination(Filters filter,
                                                string  sortCriteria  = null!,
-                                               bool    ascendingSort = true)
+                                               bool    ascendingSort = true,
+                                               int     pageSize      = 1000,
+                                               int     pageIndex     = 0)
     => new()
        {
          Filter   = filter,
-         Page     = 0,
-         PageSize = 1000,
+         Page     = pageIndex,
+         PageSize = pageSize,
          SortDirection = ascendingSort
                            ? SortDirection.Asc
                            : SortDirection.Desc,

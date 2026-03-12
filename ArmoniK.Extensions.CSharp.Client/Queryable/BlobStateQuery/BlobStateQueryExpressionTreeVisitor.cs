@@ -40,9 +40,6 @@ internal class BlobStateQueryExpressionTreeVisitor : QueryExpressionTreeVisitor<
     IsSortAscending = true;
   }
 
-  protected override bool IsWhereExpressionTreeVisitorInstantiated
-    => whereVisitor_ != null;
-
   protected override WhereExpressionTreeVisitor<ResultField, Filters, FiltersAnd, FilterField> WhereExpressionTreeVisitor
   {
     get

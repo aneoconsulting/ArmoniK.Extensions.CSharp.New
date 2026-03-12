@@ -77,7 +77,8 @@ public class BlobService : IBlobService
 
     var queryProvider = new BlobStateQueryProvider(this,
                                                    logger_);
-    queryable_ = new ArmoniKQueryable<BlobState>(queryProvider);
+    queryable_ = new ArmoniKQueryable<BlobState>(queryProvider,
+                                                 logger_);
   }
 
   /// <inheritdoc />

@@ -48,6 +48,12 @@ internal abstract class WhereExpressionTreeVisitor<TField, TFilterOr, TFilterAnd
   protected readonly Stack<(object, Type)> FilterStack = new();
 
   /// <summary>
+  ///   Whether a Where condition was visited
+  /// </summary>
+  public bool Visited
+    => FilterStack.Any();
+
+  /// <summary>
   ///   Visit the lambda Expression Tree describing the filter.
   /// </summary>
   /// <param name="lambda">the lambda Expression Tree.</param>

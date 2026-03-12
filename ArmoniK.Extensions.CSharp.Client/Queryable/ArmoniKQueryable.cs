@@ -21,6 +21,10 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Threading;
 
+using ArmoniK.Utils;
+
+using Microsoft.Extensions.Logging;
+
 namespace ArmoniK.Extensions.CSharp.Client.Queryable;
 
 /// <summary>
@@ -29,15 +33,20 @@ namespace ArmoniK.Extensions.CSharp.Client.Queryable;
 /// <typeparam name="TSource"></typeparam>
 internal class ArmoniKQueryable<TSource> : IOrderedQueryable<TSource>, IAsyncEnumerable<TSource>
 {
+  private readonly ILogger logger_;
+
   /// <summary>
   ///   Create the query object
   /// </summary>
   /// <param name="provider">The query provider</param>
+  /// <param name="logger">The logger</param>
   /// <exception cref="ArgumentNullException">When provider is null</exception>
-  public ArmoniKQueryable(IAsyncQueryProvider<TSource> provider)
+  public ArmoniKQueryable(IAsyncQueryProvider<TSource> provider,
+                          ILogger                      logger)
   {
     Provider   = provider ?? throw new ArgumentNullException(nameof(provider));
     Expression = Expression.Constant(this);
+    logger_    = logger ?? throw new ArgumentNullException(nameof(logger));
   }
 
   /// <summary>
@@ -45,12 +54,15 @@ internal class ArmoniKQueryable<TSource> : IOrderedQueryable<TSource>, IAsyncEnu
   /// </summary>
   /// <param name="provider">The query provider</param>
   /// <param name="tree">The filtering tree</param>
+  /// <param name="logger">The logger</param>
   /// <exception cref="ArgumentNullException">When provider or tree is null</exception>
   public ArmoniKQueryable(IQueryProvider provider,
-                          Expression     tree)
+                          Expression     tree,
+                          ILogger        logger)
   {
     Provider   = provider ?? throw new ArgumentNullException(nameof(provider));
     Expression = tree     ?? throw new ArgumentNullException(nameof(tree));
+    logger_    = logger   ?? throw new ArgumentNullException(nameof(logger));
   }
 
   /// <summary>
@@ -80,8 +92,13 @@ internal class ArmoniKQueryable<TSource> : IOrderedQueryable<TSource>, IAsyncEnu
     var result = Provider.Execute(Expression);
     if (result is IAsyncEnumerable<object> asyncEnumerable)
     {
+      var name = typeof(TSource).Name;
+      logger_.LogWarning("Do not use an extension method which implicitly converts an IQueryable<{Name}> into an IEnumerable<{Name}> (like ToAsyncEnumerable()) and use AsAsyncEnumerable() instead.",
+                         name,
+                         name);
       return asyncEnumerable.Cast<TSource>()
-                            .ToEnumerable()
+                            .ToListAsync()
+                            .WaitSync()
                             .GetEnumerator();
     }
 

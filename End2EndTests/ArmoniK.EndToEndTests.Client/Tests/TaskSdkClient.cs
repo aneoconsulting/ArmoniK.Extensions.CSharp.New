@@ -97,7 +97,7 @@ public class TaskSdkClient : ClientBase
 
     var allTasks = await Client!.TasksService.AsQueryable()
                                 .Where(task => task.SessionId == SessionHandle!.SessionInfo.SessionId)
-                                .ToAsyncEnumerable()
+                                .AsAsyncEnumerable()
                                 .ToArrayAsync()
                                 .ConfigureAwait(false);
     var taskSummary1 = Client!.TasksService.AsQueryable()

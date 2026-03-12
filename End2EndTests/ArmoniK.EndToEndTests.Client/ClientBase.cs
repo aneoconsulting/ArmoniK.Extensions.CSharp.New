@@ -83,6 +83,37 @@ public class ClientBase
                 .ConfigureAwait(false);
   }
 
+  protected async Task SetupBaseWithoutLibAsync()
+  {
+    var builder = new ConfigurationBuilder().SetBasePath(TestContext.CurrentContext.TestDirectory)
+                                            .AddJsonFile("appsettings.json",
+                                                         true,
+                                                         false)
+                                            .AddEnvironmentVariables();
+
+    var config = builder.Build();
+    var loggerFactory = new LoggerFactory([
+                                            new SerilogLoggerProvider(new LoggerConfiguration().ReadFrom.Configuration(config)
+                                                                                               .CreateLogger()),
+                                          ],
+                                          new LoggerFilterOptions().AddFilter("Grpc",
+                                                                              LogLevel.Error));
+
+    var properties = new Properties(config);
+    TaskConfiguration = new TaskConfiguration(5,
+                                              1,
+                                              Partition,
+                                              TimeSpan.FromSeconds(300));
+
+    Client = new ArmoniKClient(properties,
+                               loggerFactory);
+
+    SessionHandle = await Client.CreateSessionAsync([Partition],
+                                                    TaskConfiguration,
+                                                    true)
+                                .ConfigureAwait(false);
+  }
+
   protected async Task TearDownBaseAsync()
   {
     await SessionHandle!.DisposeAsync()

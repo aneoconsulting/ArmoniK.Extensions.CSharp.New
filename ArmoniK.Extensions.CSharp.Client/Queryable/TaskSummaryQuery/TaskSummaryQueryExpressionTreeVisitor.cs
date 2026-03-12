@@ -53,9 +53,6 @@ internal class TaskSummaryQueryExpressionTreeVisitor : QueryExpressionTreeVisito
   /// </summary>
   public bool UseDetailedVersion { get; set; }
 
-  protected override bool IsWhereExpressionTreeVisitorInstantiated
-    => whereVisitor_ != null;
-
   protected override WhereExpressionTreeVisitor<TaskField, Filters, FiltersAnd, FilterField> WhereExpressionTreeVisitor
   {
     get

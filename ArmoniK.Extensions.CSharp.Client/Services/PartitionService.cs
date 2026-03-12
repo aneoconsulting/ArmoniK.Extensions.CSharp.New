@@ -61,7 +61,8 @@ public class PartitionsService : IPartitionsService
 
     var queryProvider = new PartitionQueryProvider(this,
                                                    logger_);
-    queryable_ = new ArmoniKQueryable<Partition>(queryProvider);
+    queryable_ = new ArmoniKQueryable<Partition>(queryProvider,
+                                                 logger_);
   }
 
   /// <inheritdoc />

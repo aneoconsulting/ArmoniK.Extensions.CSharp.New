@@ -70,10 +70,12 @@ internal class TaskSummaryQueryExecution : QueryExecution<TaskPage, TaskSummary,
            {
              UseDetailedVersion = useDetailedVersion,
              Filter             = visitor.Filters!,
-             Page               = 0,
+             Page = visitor.PageIndex.HasValue
+                      ? visitor.PageIndex.Value
+                      : 0,
              PageSize = visitor.PageSize.HasValue
                           ? visitor.PageSize.Value
-                          : 1000,
+                          : QueryExpressionTreeVisitor<TaskSummary, TaskField, Filters, FiltersAnd, FilterField>.MAX_PAGE_SIZE,
              SortDirection = visitor.IsSortAscending
                                ? SortDirection.Asc
                                : SortDirection.Desc,

@@ -63,10 +63,12 @@ internal class BlobStateQueryExecution : QueryExecution<BlobPage, BlobState, Res
     => new BlobPagination
        {
          Filter = visitor.Filters!,
-         Page   = 0,
+         Page = visitor.PageIndex.HasValue
+                  ? visitor.PageIndex.Value
+                  : 0,
          PageSize = visitor.PageSize.HasValue
                       ? visitor.PageSize.Value
-                      : 1000,
+                      : QueryExpressionTreeVisitor<BlobState, ResultField, Filters, FiltersAnd, FilterField>.MAX_PAGE_SIZE,
          SortDirection = visitor.IsSortAscending
                            ? SortDirection.Asc
                            : SortDirection.Desc,

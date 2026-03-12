@@ -57,7 +57,8 @@ internal abstract class ArmoniKQueryProvider<TService, TPage, TSource, TField, T
   /// <returns>The query object</returns>
   public IQueryable CreateQuery(Expression expression)
     => new ArmoniKQueryable<TSource>(this,
-                                     expression);
+                                     expression,
+                                     Logger);
 
   /// <summary>
   ///   Create the query object
@@ -66,7 +67,8 @@ internal abstract class ArmoniKQueryProvider<TService, TPage, TSource, TField, T
   /// <returns>The query object</returns>
   public IQueryable<TElement> CreateQuery<TElement>(Expression expression)
     => new ArmoniKQueryable<TElement>(this,
-                                      expression);
+                                      expression,
+                                      Logger);
 
   /// <summary>
   ///   Visit the expression tree and generate the protobuf filtering structures
@@ -79,19 +81,9 @@ internal abstract class ArmoniKQueryProvider<TService, TPage, TSource, TField, T
   {
     QueryExecution = CreateQueryExecution();
     QueryExecution.VisitExpression(expression);
-    if (QueryExecution.FuncReturnTSource != null)
-    {
-      return QueryExecution.FuncReturnTSource(QueryExecution.ExecuteAsync()
-                                                            .Cast<TSource>());
-    }
-
-    if (QueryExecution.FuncReturnNullableTSource != null)
-    {
-      return QueryExecution.FuncReturnNullableTSource(QueryExecution.ExecuteAsync()
-                                                                    .Cast<TSource>());
-    }
-
-    return QueryExecution.ExecuteAsync();
+    var result = QueryExecution.RunAllExtensionsMethods(QueryExecution.ExecuteAsync()
+                                                                      .Cast<TSource>());
+    return QueryExecution.RunFunctionReturningScalar(result);
   }
 
   /// <summary>
@@ -117,8 +109,8 @@ internal abstract class ArmoniKQueryProvider<TService, TPage, TSource, TField, T
   {
     QueryExecution = CreateQueryExecution();
     QueryExecution.VisitExpression(expression);
-    return QueryExecution.ExecuteAsync(cancellationToken)
-                         .Cast<TSource>();
+    return QueryExecution.RunAllExtensionsMethods(QueryExecution.ExecuteAsync(cancellationToken)
+                                                                .Cast<TSource>())!;
   }
 
   protected abstract QueryExecution<TPage, TSource, TField, TFilterOr, TFilterAnd, TFilterField> CreateQueryExecution();
