@@ -38,16 +38,16 @@ public record TaskState : TaskInfos
   /// <summary>
   ///   Initializes a new instance of the TaskState class with details about task timings and status.
   /// </summary>
-  /// <param name="createAt">The creation time of the task.</param>
+  /// <param name="createdAt">The creation time of the task.</param>
   /// <param name="endedAt">The end time of the task.</param>
   /// <param name="startedAt">The start time of the task.</param>
   /// <param name="status">The status of the task.</param>
-  public TaskState(DateTime   createAt,
+  public TaskState(DateTime   createdAt,
                    DateTime?  endedAt,
                    DateTime?  startedAt,
                    TaskStatus status)
   {
-    CreatedAt = createAt;
+    CreatedAt = createdAt;
     EndedAt   = endedAt;
     StartedAt = startedAt;
     Status    = status;

@@ -54,7 +54,7 @@ public class TaskSummary
   /// <summary>
   ///   Gets the configuration options for the task, which may be null if no additional configurations are specified.
   /// </summary>
-  public TaskConfiguration TaskOptions { get; set; } = new();
+  public TaskConfiguration TaskOptions { get; } = new();
 
   /// <summary>
   ///   The ID of the Task that as submitted this task if any.
