@@ -682,7 +682,7 @@ public class BooleanExpressionFilterBlobTests : BaseBlobFilterTests
 
     // Build the query that get all blobs from session "session1"
     var query = client.BlobService.AsQueryable()
-                      .Where(blobState => blobState.BlobName == "myBlob" && (blobState.BlobId == "blob1" && blobState.BlobId == "blob2"));
+                      .Where(blobState => blobState.BlobName == "myBlob" && blobState.BlobId == "blob1" && blobState.BlobId == "blob2");
 
     // Execute the query
     var result = query.AsAsyncEnumerable()

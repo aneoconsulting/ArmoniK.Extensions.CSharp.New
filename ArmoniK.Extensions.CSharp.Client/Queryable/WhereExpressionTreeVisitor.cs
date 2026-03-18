@@ -767,13 +767,16 @@ internal abstract class WhereExpressionTreeVisitor<TField, TFilterOr, TFilterAnd
           {
             foreach (var rhsFilterAnd in GetRepeatedFilterAnd(rhsFilterOr))
             {
-              GetRepeatedFilterField(rhsFilterAnd).Add(lhsFilterField);
+              GetRepeatedFilterField(rhsFilterAnd)
+                .Add(lhsFilterField);
             }
+
             FilterStack.Push((rhsFilterOr, typeof(bool)));
           }
           else if (rhsFilter is TFilterAnd rhsFilterAnd)
           {
-            GetRepeatedFilterField(rhsFilterAnd).Add(lhsFilterField);
+            GetRepeatedFilterField(rhsFilterAnd)
+              .Add(lhsFilterField);
             FilterStack.Push((rhsFilterAnd, typeof(bool)));
           }
           else if (rhsFilter is TFilterField rhsFilterField)
