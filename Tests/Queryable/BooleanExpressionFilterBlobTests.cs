@@ -632,6 +632,67 @@ public class BooleanExpressionFilterBlobTests : BaseBlobFilterTests
                 Is.EqualTo(BuildBlobPagination(filter)));
   }
 
+  // <filter field> && <or expression>
+  [Test]
+  public void AndExpressionOfFilterAndOr()
+  {
+    var client = new MockedArmoniKClient();
+
+    var filter = BuildOr(BuildAnd(BuildFilterString("BlobId",
+                                                    "==",
+                                                    "blob1"),
+                                  BuildFilterString("BlobName",
+                                                    "==",
+                                                    "myBlob")),
+                         BuildAnd(BuildFilterString("BlobId",
+                                                    "==",
+                                                    "blob2"),
+                                  BuildFilterString("BlobName",
+                                                    "==",
+                                                    "myBlob")));
+
+    // Build the query that get all blobs from session "session1"
+    var query = client.BlobService.AsQueryable()
+                      .Where(blobState => blobState.BlobName == "myBlob" && (blobState.BlobId == "blob1" || blobState.BlobId == "blob2"));
+
+    // Execute the query
+    var result = query.AsAsyncEnumerable()
+                      .ToListAsync();
+
+    var blobQueryProvider = (BlobStateQueryProvider)((ArmoniKQueryable<BlobState>)query).Provider;
+    Assert.That(blobQueryProvider.QueryExecution!.PaginationInstance,
+                Is.EqualTo(BuildBlobPagination(filter)));
+  }
+
+  // <filter field> && <and expression>
+  [Test]
+  public void AndExpressionOfFilterAndAnd()
+  {
+    var client = new MockedArmoniKClient();
+
+    var filter = BuildOr(BuildAnd(BuildFilterString("BlobId",
+                                                    "==",
+                                                    "blob1"),
+                                  BuildFilterString("BlobId",
+                                                    "==",
+                                                    "blob2"),
+                                  BuildFilterString("BlobName",
+                                                    "==",
+                                                    "myBlob")));
+
+    // Build the query that get all blobs from session "session1"
+    var query = client.BlobService.AsQueryable()
+                      .Where(blobState => blobState.BlobName == "myBlob" && (blobState.BlobId == "blob1" && blobState.BlobId == "blob2"));
+
+    // Execute the query
+    var result = query.AsAsyncEnumerable()
+                      .ToListAsync();
+
+    var blobQueryProvider = (BlobStateQueryProvider)((ArmoniKQueryable<BlobState>)query).Provider;
+    Assert.That(blobQueryProvider.QueryExecution!.PaginationInstance,
+                Is.EqualTo(BuildBlobPagination(filter)));
+  }
+
   // <and expression> && <or expression>
   [Test]
   public void AndExpressionOfAndAndOr()
