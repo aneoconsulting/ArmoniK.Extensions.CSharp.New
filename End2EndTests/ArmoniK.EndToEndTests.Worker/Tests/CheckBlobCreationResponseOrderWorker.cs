@@ -14,6 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using ArmoniK.Extensions.CSharp.Common.Common.Domain.Task;
 using ArmoniK.Extensions.CSharp.Worker.Interfaces;
 using ArmoniK.Extensions.CSharp.Worker.Interfaces.Common.Domain.Blob;
 using ArmoniK.Extensions.CSharp.Worker.Interfaces.Common.Domain.Task;

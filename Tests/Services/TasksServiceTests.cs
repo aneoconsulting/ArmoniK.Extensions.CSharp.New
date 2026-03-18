@@ -16,6 +16,7 @@
 
 using System.Text;
 
+using ArmoniK.Api.gRPC.V1;
 using ArmoniK.Api.gRPC.V1.Tasks;
 using ArmoniK.Extensions.CSharp.Client.Common.Domain.Blob;
 using ArmoniK.Extensions.CSharp.Client.Common.Domain.Session;
@@ -423,19 +424,21 @@ public class TasksServiceTests
                          {
                            new TaskSummary
                            {
-                             Id        = "taskId1",
-                             Status    = (V1_TaskStatus)TaskStatus.Completed,
-                             CreatedAt = Timestamp.FromDateTime(DateTime.UtcNow),
-                             StartedAt = Timestamp.FromDateTime(DateTime.UtcNow.AddMinutes(-5)),
-                             EndedAt   = Timestamp.FromDateTime(DateTime.UtcNow.AddMinutes(-1)),
+                             Id          = "taskId1",
+                             Status      = (V1_TaskStatus)TaskStatus.Completed,
+                             CreatedAt   = Timestamp.FromDateTime(DateTime.UtcNow),
+                             SubmittedAt = Timestamp.FromDateTime(DateTime.UtcNow),
+                             StartedAt   = Timestamp.FromDateTime(DateTime.UtcNow.AddMinutes(-5)),
+                             EndedAt     = Timestamp.FromDateTime(DateTime.UtcNow.AddMinutes(-1)),
                            },
                            new TaskSummary
                            {
-                             Id        = "taskId2",
-                             Status    = (V1_TaskStatus)TaskStatus.Cancelling,
-                             CreatedAt = Timestamp.FromDateTime(DateTime.UtcNow),
-                             StartedAt = Timestamp.FromDateTime(DateTime.UtcNow.AddMinutes(-10)),
-                             EndedAt   = Timestamp.FromDateTime(DateTime.UtcNow.AddMinutes(-5)),
+                             Id          = "taskId2",
+                             Status      = (V1_TaskStatus)TaskStatus.Cancelling,
+                             CreatedAt   = Timestamp.FromDateTime(DateTime.UtcNow),
+                             SubmittedAt = Timestamp.FromDateTime(DateTime.UtcNow),
+                             StartedAt   = Timestamp.FromDateTime(DateTime.UtcNow.AddMinutes(-10)),
+                             EndedAt     = Timestamp.FromDateTime(DateTime.UtcNow.AddMinutes(-5)),
                            },
                          },
                          Total = 2,
@@ -505,10 +508,15 @@ public class TasksServiceTests
                                   {
                                     "dependencyId1",
                                   },
-                                  CreatedAt = Timestamp.FromDateTime(DateTime.UtcNow),
-                                  StartedAt = Timestamp.FromDateTime(DateTime.UtcNow.AddMinutes(-5)),
-                                  EndedAt   = Timestamp.FromDateTime(DateTime.UtcNow.AddMinutes(-1)),
-                                  SessionId = "sessionId1",
+                                  CreatedAt   = Timestamp.FromDateTime(DateTime.UtcNow),
+                                  SubmittedAt = Timestamp.FromDateTime(DateTime.UtcNow),
+                                  StartedAt   = Timestamp.FromDateTime(DateTime.UtcNow.AddMinutes(-5)),
+                                  EndedAt     = Timestamp.FromDateTime(DateTime.UtcNow.AddMinutes(-1)),
+                                  SessionId   = "sessionId1",
+                                  Options = new TaskOptions
+                                            {
+                                              MaxDuration = Duration.FromTimeSpan(TimeSpan.FromMinutes(30)),
+                                            },
                                 },
                        };
 
@@ -551,11 +559,12 @@ public class TasksServiceTests
                          {
                            new TaskDetailed
                            {
-                             Id        = "taskId1",
-                             Status    = V1_TaskStatus.Completed,
-                             CreatedAt = Timestamp.FromDateTime(DateTime.UtcNow),
-                             StartedAt = Timestamp.FromDateTime(DateTime.UtcNow.AddMinutes(-5)),
-                             EndedAt   = Timestamp.FromDateTime(DateTime.UtcNow.AddMinutes(-1)),
+                             Id          = "taskId1",
+                             Status      = V1_TaskStatus.Completed,
+                             CreatedAt   = Timestamp.FromDateTime(DateTime.UtcNow),
+                             SubmittedAt = Timestamp.FromDateTime(DateTime.UtcNow),
+                             StartedAt   = Timestamp.FromDateTime(DateTime.UtcNow.AddMinutes(-5)),
+                             EndedAt     = Timestamp.FromDateTime(DateTime.UtcNow.AddMinutes(-1)),
                              ExpectedOutputIds =
                              {
                                "outputId1",
@@ -565,14 +574,19 @@ public class TasksServiceTests
                                "dependencyId1",
                              },
                              SessionId = "sessionId1",
+                             Options = new TaskOptions
+                                       {
+                                         MaxDuration = Duration.FromTimeSpan(TimeSpan.FromMinutes(30)),
+                                       },
                            },
                            new TaskDetailed
                            {
-                             Id        = "taskId2",
-                             Status    = V1_TaskStatus.Cancelling,
-                             CreatedAt = Timestamp.FromDateTime(DateTime.UtcNow),
-                             StartedAt = Timestamp.FromDateTime(DateTime.UtcNow.AddMinutes(-10)),
-                             EndedAt   = Timestamp.FromDateTime(DateTime.UtcNow.AddMinutes(-5)),
+                             Id          = "taskId2",
+                             Status      = V1_TaskStatus.Cancelling,
+                             CreatedAt   = Timestamp.FromDateTime(DateTime.UtcNow),
+                             SubmittedAt = Timestamp.FromDateTime(DateTime.UtcNow),
+                             StartedAt   = Timestamp.FromDateTime(DateTime.UtcNow.AddMinutes(-10)),
+                             EndedAt     = Timestamp.FromDateTime(DateTime.UtcNow.AddMinutes(-5)),
                              ExpectedOutputIds =
                              {
                                "outputId2",
@@ -582,6 +596,10 @@ public class TasksServiceTests
                                "dependencyId2",
                              },
                              SessionId = "sessionId1",
+                             Options = new TaskOptions
+                                       {
+                                         MaxDuration = Duration.FromTimeSpan(TimeSpan.FromMinutes(30)),
+                                       },
                            },
                          },
                          Total = 2,
@@ -644,23 +662,25 @@ public class TasksServiceTests
                            {
                              new TaskSummary
                              {
-                               Id        = "taskId1",
-                               Status    = V1_TaskStatus.Cancelled,
-                               CreatedAt = Timestamp.FromDateTime(DateTime.UtcNow.AddMinutes(-10)),
-                               StartedAt = Timestamp.FromDateTime(DateTime.UtcNow.AddMinutes(-5)),
-                               EndedAt   = Timestamp.FromDateTime(DateTime.UtcNow),
-                               SessionId = "sessionId1",
-                               PayloadId = "payloadId1",
+                               Id          = "taskId1",
+                               Status      = V1_TaskStatus.Cancelled,
+                               CreatedAt   = Timestamp.FromDateTime(DateTime.UtcNow.AddMinutes(-10)),
+                               SubmittedAt = Timestamp.FromDateTime(DateTime.UtcNow.AddMinutes(-10)),
+                               StartedAt   = Timestamp.FromDateTime(DateTime.UtcNow.AddMinutes(-5)),
+                               EndedAt     = Timestamp.FromDateTime(DateTime.UtcNow),
+                               SessionId   = "sessionId1",
+                               PayloadId   = "payloadId1",
                              },
                              new TaskSummary
                              {
-                               Id        = "taskId2",
-                               Status    = V1_TaskStatus.Cancelled,
-                               CreatedAt = Timestamp.FromDateTime(DateTime.UtcNow.AddMinutes(-8)),
-                               StartedAt = Timestamp.FromDateTime(DateTime.UtcNow.AddMinutes(-3)),
-                               EndedAt   = Timestamp.FromDateTime(DateTime.UtcNow),
-                               SessionId = "sessionId1",
-                               PayloadId = "payloadId2",
+                               Id          = "taskId2",
+                               Status      = V1_TaskStatus.Cancelled,
+                               CreatedAt   = Timestamp.FromDateTime(DateTime.UtcNow.AddMinutes(-8)),
+                               SubmittedAt = Timestamp.FromDateTime(DateTime.UtcNow.AddMinutes(-8)),
+                               StartedAt   = Timestamp.FromDateTime(DateTime.UtcNow.AddMinutes(-3)),
+                               EndedAt     = Timestamp.FromDateTime(DateTime.UtcNow),
+                               SessionId   = "sessionId1",
+                               PayloadId   = "payloadId2",
                              },
                            },
                          };

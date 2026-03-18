@@ -14,12 +14,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using System.Linq;
+
 using ArmoniK.Api.gRPC.V1;
-using ArmoniK.Extensions.CSharp.Common.Common.Domain.Task;
 using ArmoniK.Extensions.CSharp.Common.Exceptions;
 using ArmoniK.Extensions.CSharp.Common.Library;
 
-namespace ArmoniK.Extensions.CSharp.Worker.Common.Domain.Task;
+namespace ArmoniK.Extensions.CSharp.Common.Common.Domain.Task;
 
 /// <summary>
 ///   Provides extension methods for TaskOptions
@@ -36,7 +37,8 @@ public static class TaskOptionExt
            taskOption.Priority,
            taskOption.PartitionId,
            taskOption.MaxDuration.ToTimeSpan(),
-           taskOption.Options.ToDictionary());
+           taskOption.Options.ToDictionary(pair => pair.Key,
+                                           pair => pair.Value));
 
   /// <summary>
   ///   Get a DynamicLibrary from the TaskOptions.

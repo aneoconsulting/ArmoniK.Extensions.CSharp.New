@@ -38,7 +38,7 @@ public class TaskStateTests
                                   TaskStatus.Completed);
     Assert.Multiple(() =>
                     {
-                      Assert.That(taskState.CreateAt,
+                      Assert.That(taskState.CreatedAt,
                                   Is.EqualTo(createAt));
                       Assert.That(taskState.EndedAt,
                                   Is.EqualTo(endedAt));
@@ -61,6 +61,8 @@ public class TaskStateTests
   [TestCase(TaskStatus.Processing)]
   [TestCase(TaskStatus.Processed)]
   [TestCase(TaskStatus.Retried)]
+  [TestCase(TaskStatus.Paused)]
+  [TestCase(TaskStatus.Pending)]
   [TestCase((TaskStatus)99)]
   public void TestTaskStatus(TaskStatus status)
   {
@@ -78,6 +80,8 @@ public class TaskStateTests
       case TaskStatus.Processing:
       case TaskStatus.Processed:
       case TaskStatus.Retried:
+      case TaskStatus.Paused:
+      case TaskStatus.Pending:
         var grpcStatus = status.ToGrpcStatus();
         Assert.That(grpcStatus.ToString(),
                     Is.EqualTo(status.ToString()));
