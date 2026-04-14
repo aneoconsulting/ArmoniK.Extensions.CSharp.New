@@ -1028,6 +1028,29 @@ public class FilterBlobTests : BaseBlobFilterTests
                 Is.EqualTo(50));
   }
 
+  [Test]
+  public void BlobFilterWithPageIndex()
+  {
+    var client = new MockedArmoniKClient();
+
+    // That query require to fetch the page 2 only
+    var query = client.BlobService.AsQueryable()
+                      .Where(blobState => blobState.SessionId == "session1")
+                      .Skip(100)
+                      .Take(50)
+                      .WithPageSize(50);
+
+    // Execute the query
+    var result = query.AsAsyncEnumerable()
+                      .ToListAsync();
+
+    var blobQueryProvider = (BlobStateQueryProvider)((ArmoniKQueryable<BlobState>)query).Provider;
+    Assert.That(blobQueryProvider.QueryExecution!.PaginationInstance.PageSize,
+                Is.EqualTo(50));
+    Assert.That(blobQueryProvider.QueryExecution!.PaginationInstance.Page,
+                Is.EqualTo(2));
+  }
+
   private class RecursiveClass
   {
     public RecursiveClass? Inner { get; init; }
