@@ -371,8 +371,8 @@ public class SessionHandle : IAsyncDisposable, IDisposable
       try
       {
         await foreach (var chunk in taskSubmissionChannel_.Reader.ToAsyncEnumerable(submissionCts_.Token)
-                                                          .ToChunksAsync(1000,
-                                                                         TimeSpan.FromSeconds(5),
+                                                          .ToChunksAsync(armoniKClient_.Properties.TaskSubmissionBatchSize,
+                                                                         armoniKClient_.Properties.TaskSubmissionBatchWindow,
                                                                          submissionCts_.Token)
                                                           .ConfigureAwait(false))
         {
@@ -649,8 +649,8 @@ public class SessionHandle : IAsyncDisposable, IDisposable
             ResetTaskCompletionSource();
           }
 
-          // Wait for 5 second and then retry
-          await Task.Delay(5000,
+          // Wait for the configured polling interval and then retry
+          await Task.Delay(client_.Properties.CallbackPollingInterval,
                            loopCts_.Token)
                     .ConfigureAwait(false);
         }

@@ -294,4 +294,20 @@ public record Properties
   ///   Max backoff for retries
   /// </summary>
   public TimeSpan RetryMaxBackoff { get; init; } = TimeSpan.FromSeconds(30);
+
+  /// <summary>
+  ///   Interval between two polling attempts when waiting for blob/result completion to invoke registered callbacks
+  /// </summary>
+  public TimeSpan CallbackPollingInterval { get; init; } = TimeSpan.FromSeconds(5);
+
+  /// <summary>
+  ///   Maximum number of tasks batched together in a single submission request
+  /// </summary>
+  public int TaskSubmissionBatchSize { get; init; } = 1000;
+
+  /// <summary>
+  ///   Maximum time to wait before submitting a batch of tasks that has not yet reached
+  ///   <see cref="TaskSubmissionBatchSize" />
+  /// </summary>
+  public TimeSpan TaskSubmissionBatchWindow { get; init; } = TimeSpan.FromSeconds(5);
 }
