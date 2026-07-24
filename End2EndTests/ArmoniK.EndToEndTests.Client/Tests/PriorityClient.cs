@@ -19,7 +19,6 @@ using System.Text;
 using ArmoniK.Extensions.CSharp.Client.Common.Domain.Blob;
 using ArmoniK.Extensions.CSharp.Client.Common.Domain.Task;
 using ArmoniK.Extensions.CSharp.Client.Handles;
-using ArmoniK.Extensions.CSharp.Common.Common.Domain.Blob;
 
 namespace ArmoniK.EndToEndTests.Client.Tests;
 
@@ -78,14 +77,8 @@ public class PriorityClient : ClientBase
       taskDefinitions.Clear();
     }
 
-    var allResults = new List<BlobInfo>();
-    foreach (var output in allTasks.SelectMany(t => t.Outputs.Values))
-    {
-      var blobHandle = await output.GetBlobHandleAsync()
-                                   .ConfigureAwait(false);
-      allResults.Add(blobHandle.BlobInfo);
-    }
-
+    var allResults = allTasks.SelectMany(t => t.Outputs.Values.Select(o => o.BlobHandle!.BlobInfo))
+                             .ToList();
     await Client!.EventsService.WaitForBlobsAsync(SessionHandle!,
                                                   allResults,
                                                   CancellationToken.None)

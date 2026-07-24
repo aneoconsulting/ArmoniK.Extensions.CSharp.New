@@ -20,7 +20,6 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 
 using ArmoniK.Extensions.CSharp.Client.Exceptions;
 using ArmoniK.Extensions.CSharp.Client.Handles;
@@ -32,17 +31,9 @@ namespace ArmoniK.Extensions.CSharp.Client.Common.Domain.Blob;
 /// </summary>
 public class BlobDefinition
 {
-  private readonly FileInfo? file_;
-
-  /// <summary>
-  ///   Promise of the BlobHandle once the blob has been registered.
-  ///   It needs to be volatile as we need it to play the role of a barrier in GetBlobHandleAsync().
-  /// </summary>
-  private volatile TaskCompletionSource<BlobHandle>? blobHandleSource_ = new();
-
-  private BlobHandle?           blobHandle_;
-  private long                  dataSize_;
-  private ReadOnlyMemory<byte>? data_;
+  private readonly FileInfo?             file_;
+  private          long                  dataSize_;
+  private          ReadOnlyMemory<byte>? data_;
 
   /// <summary>
   ///   Creation of a blob definition with known data
@@ -118,18 +109,7 @@ public class BlobDefinition
   /// <summary>
   ///   Handle once the blob has been registered
   /// </summary>
-  internal BlobHandle? BlobHandle
-  {
-    get => blobHandle_;
-    set
-    {
-      blobHandle_ = value;
-      if (value != null)
-      {
-        blobHandleSource_?.TrySetResult(value);
-      }
-    }
-  }
+  public BlobHandle? BlobHandle { get; internal set; }
 
   /// <summary>
   ///   Indicates whether the blob may be a pipe,
@@ -137,43 +117,6 @@ public class BlobDefinition
   /// </summary>
   internal bool MayBeAPipe
     => dataSize_ == 0 && file_ != null;
-
-  /// <summary>
-  ///   Get the blob handle once the blob has been registered.
-  ///   This awaits until the blob has actually been created, which may happen asynchronously
-  ///   (e.g. when task submission batching is enabled).
-  /// </summary>
-  /// <returns>A task representing the asynchronous operation. The task result contains the BlobHandle instance.</returns>
-  public ValueTask<BlobHandle> GetBlobHandleAsync()
-  {
-    var blobHandle = blobHandle_;
-    if (blobHandle is not null)
-    {
-      return new ValueTask<BlobHandle>(blobHandle);
-    }
-
-    return Core();
-
-    async ValueTask<BlobHandle> Core()
-    {
-      // volatile read of blobHandleSource_ here has acquire semantics and with the combination
-      // of the volatile write of blobHandleSource_ below, it ensures that if we see a null value for blobHandleSource_,
-      // we are guaranteed to see a non-null value for blobHandle_.
-      var tcs = blobHandleSource_;
-      if (tcs is null)
-      {
-        return blobHandle_!;
-      }
-
-      var handle = await tcs.Task.ConfigureAwait(false);
-      blobHandle_ = handle;
-      // volatile write of blobHandleSource_ here has release semantics (allows other threads to see the effects of preceding operations).
-      // This prevent the compiler to do some operation reordering, then we are sure blobHandle_ has actually been assigned when we reach that point
-      // therefore if a thread can see a null blobHandleSource_, it is guaranteed to see a non-null blobHandle_.
-      blobHandleSource_ = null;
-      return handle;
-    }
-  }
 
   /// <summary>
   ///   Fetch the last state the file, whenever the blob comes from a file.
