@@ -111,8 +111,9 @@ internal class Program
     var taskInfo = await taskHandle.GetTaskInfosAsync()
                                    .ConfigureAwait(false);
 
-    BlobInfo resultBlobInfo = task.Outputs.Values.First()
-                                  .BlobHandle!;
+    BlobInfo resultBlobInfo = await task.Outputs.Values.First()
+                                        .GetBlobHandleAsync()
+                                        .ConfigureAwait(false);
     logger.LogInformation("resultId: {ResultId}",
                           resultBlobInfo.BlobId);
     logger.LogInformation("taskId: {TaskId}",

@@ -58,10 +58,12 @@ public class TaskSdkClient : ClientBase
     var resultString = "";
     var outputName = taskDefinition.Outputs.Single()
                                    .Key;
-    var outputBlobHandle = taskDefinition.Outputs.Single()
-                                         .Value.BlobHandle;
-    var inputBlobHandle = taskDefinition.InputDefinitions.Single()
-                                        .Value.BlobHandle;
+    var outputBlobHandle = await taskDefinition.Outputs.Single()
+                                               .Value.GetBlobHandleAsync()
+                                               .ConfigureAwait(false);
+    var inputBlobHandle = await taskDefinition.InputDefinitions.Single()
+                                              .Value.GetBlobHandleAsync()
+                                              .ConfigureAwait(false);
     if (outputName == "outputString")
     {
       resultString = Encoding.UTF8.GetString(callback.Result);
