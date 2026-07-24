@@ -32,9 +32,7 @@ namespace ArmoniK.Extensions.CSharp.Client.Common.Domain.Blob;
 /// </summary>
 public class BlobDefinition
 {
-  private readonly FileInfo?             file_;
-  private          long                  dataSize_;
-  private          ReadOnlyMemory<byte>? data_;
+  private readonly FileInfo? file_;
 
   /// <summary>
   ///   Promise of the BlobHandle once the blob has been registered.
@@ -42,7 +40,9 @@ public class BlobDefinition
   /// </summary>
   private volatile TaskCompletionSource<BlobHandle>? blobHandleSource_ = new();
 
-  private BlobHandle? blobHandle_;
+  private BlobHandle?           blobHandle_;
+  private long                  dataSize_;
+  private ReadOnlyMemory<byte>? data_;
 
   /// <summary>
   ///   Creation of a blob definition with known data
@@ -132,6 +132,13 @@ public class BlobDefinition
   }
 
   /// <summary>
+  ///   Indicates whether the blob may be a pipe,
+  ///   when true it is not necessarily a pipe, when false we're sure it's not a pipe.
+  /// </summary>
+  internal bool MayBeAPipe
+    => dataSize_ == 0 && file_ != null;
+
+  /// <summary>
   ///   Get the blob handle once the blob has been registered.
   ///   This awaits until the blob has actually been created, which may happen asynchronously
   ///   (e.g. when task submission batching is enabled).
@@ -167,13 +174,6 @@ public class BlobDefinition
       return handle;
     }
   }
-
-  /// <summary>
-  ///   Indicates whether the blob may be a pipe,
-  ///   when true it is not necessarily a pipe, when false we're sure it's not a pipe.
-  /// </summary>
-  internal bool MayBeAPipe
-    => dataSize_ == 0 && file_ != null;
 
   /// <summary>
   ///   Fetch the last state the file, whenever the blob comes from a file.

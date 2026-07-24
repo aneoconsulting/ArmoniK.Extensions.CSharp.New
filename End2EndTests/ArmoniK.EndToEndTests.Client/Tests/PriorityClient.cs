@@ -85,6 +85,7 @@ public class PriorityClient : ClientBase
                                    .ConfigureAwait(false);
       allResults.Add(blobHandle.BlobInfo);
     }
+
     await Client!.EventsService.WaitForBlobsAsync(SessionHandle!,
                                                   allResults,
                                                   CancellationToken.None)
