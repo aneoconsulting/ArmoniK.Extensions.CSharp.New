@@ -58,7 +58,9 @@ internal class CheckBlobCreationResponseOrderClient : ClientBase
 
     foreach (var blob in taskDefinition.Outputs.Values)
     {
-      var name = blob.BlobHandle!.BlobInfo.BlobName;
+      var blobHandle = await blob.GetBlobHandleAsync()
+                                 .ConfigureAwait(false);
+      var name = blobHandle.BlobInfo.BlobName;
       var data = ((Callback)blob.CallBack!).Result;
       Assert.That(data,
                   Is.EqualTo(name));
