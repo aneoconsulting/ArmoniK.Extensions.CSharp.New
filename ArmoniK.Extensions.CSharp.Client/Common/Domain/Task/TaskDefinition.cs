@@ -17,7 +17,6 @@
 using System.Collections.Generic;
 
 using ArmoniK.Extensions.CSharp.Client.Common.Domain.Blob;
-using ArmoniK.Extensions.CSharp.Client.Exceptions;
 using ArmoniK.Extensions.CSharp.Common.Common.Domain.Blob;
 using ArmoniK.Extensions.CSharp.Common.Common.Domain.Task;
 using ArmoniK.Extensions.CSharp.Common.Library;
@@ -32,12 +31,12 @@ public class TaskDefinition
   /// <summary>
   ///   Input Blobs to be created
   /// </summary>
-  public Dictionary<string, BlobDefinition> InputDefinitions { get; } = new();
+  public Dictionary<string, InputBlobDefinition> InputDefinitions { get; } = new();
 
   /// <summary>
   ///   Output blobs
   /// </summary>
-  public Dictionary<string, BlobDefinition> Outputs { get; } = new();
+  public Dictionary<string, OutputBlobDefinition> Outputs { get; } = new();
 
   /// <summary>
   ///   Task options
@@ -72,8 +71,8 @@ public class TaskDefinition
   /// <param name="inputName">The blob's input name (which may differ from blob's name)</param>
   /// <param name="blobDeclaration">The blob definition</param>
   /// <returns>The TaskDefinition updated</returns>
-  public TaskDefinition WithInput(string         inputName,
-                                  BlobDefinition blobDeclaration)
+  public TaskDefinition WithInput(string              inputName,
+                                  InputBlobDefinition blobDeclaration)
   {
     InputDefinitions.Add(inputName,
                          blobDeclaration);
@@ -86,16 +85,9 @@ public class TaskDefinition
   /// <param name="outputName">The blob's output name (which may differ from blob's name)</param>
   /// <param name="blobDeclaration">The output blob's definition</param>
   /// <returns>The TaskDefinition updated</returns>
-  public TaskDefinition WithOutput(string         outputName,
-                                   BlobDefinition blobDeclaration)
+  public TaskDefinition WithOutput(string               outputName,
+                                   OutputBlobDefinition blobDeclaration)
   {
-    if (blobDeclaration.BlobHandle != null)
-    {
-      var resolvedBlobInfo = blobDeclaration.BlobHandle.ResolvedBlobInfoOrNull;
-      throw new
-        ArmoniKSdkException($"The task cannot take as output the already created blob '{resolvedBlobInfo?.BlobName}' with with BlobId '{resolvedBlobInfo?.BlobId}'");
-    }
-
     Outputs.Add(outputName,
                 blobDeclaration);
     return this;

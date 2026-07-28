@@ -308,7 +308,7 @@ public class SessionHandle : IAsyncDisposable, IDisposable
   /// <param name="task">The task definition whose blob definitions should get a pending handle.</param>
   private void EnsureBlobHandles(TaskDefinition task)
   {
-    foreach (var blobDefinition in task.InputDefinitions.Values.Union(task.Outputs.Values))
+    foreach (var blobDefinition in task.InputDefinitions.Values.Union<BlobDefinition>(task.Outputs.Values))
     {
       blobDefinition.EnsureBlobHandle(ArmoniKClient);
     }

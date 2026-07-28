@@ -186,7 +186,7 @@ public class TasksService : ITasksService
 
     // Create all blobs from blob definitions
     await blobService_.CreateBlobsAsync(session,
-                                        taskDefinitions.SelectMany(t => t.InputDefinitions.Values.Union(t.Outputs.Values))
+                                        taskDefinitions.SelectMany(t => t.InputDefinitions.Values.Union<BlobDefinition>(t.Outputs.Values))
                                                        .Distinct(),
                                         cancellationToken)
                       .ConfigureAwait(false);
@@ -235,8 +235,8 @@ public class TasksService : ITasksService
     var payloadsDefinition = payloadsJson.Select(p =>
                                                  {
                                                    payloadIndex++;
-                                                   return BlobDefinition.FromString("payload" + payloadIndex,
-                                                                                    p);
+                                                   return InputBlobDefinition.FromString("payload" + payloadIndex,
+                                                                                         p);
                                                  })
                                          .ToList();
     await blobService_.CreateBlobsAsync(session,

@@ -63,9 +63,9 @@ public class PriorityClient : ClientBase
         var resultName = "Result" + priority;
         var taskDefinition = new TaskDefinition().WithLibrary(WorkerLibrary!)
                                                  .WithInput("Priority",
-                                                            BlobDefinition.FromBlobHandle(priorityBlobHandle))
+                                                            InputBlobDefinition.FromBlobHandle(priorityBlobHandle))
                                                  .WithOutput(resultName,
-                                                             BlobDefinition.CreateOutput(resultName))
+                                                             OutputBlobDefinition.CreateOutput(resultName))
                                                  .WithTaskOptions(options);
         taskDefinitions.Add(taskDefinition);
       }

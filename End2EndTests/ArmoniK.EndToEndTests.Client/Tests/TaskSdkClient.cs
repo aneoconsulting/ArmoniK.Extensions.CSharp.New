@@ -44,11 +44,11 @@ public class TaskSdkClient : ClientBase
     var callback = new Callback();
     var taskDefinition = new TaskDefinition().WithLibrary(WorkerLibrary!)
                                              .WithInput("inputString",
-                                                        BlobDefinition.FromString("blobInputString",
-                                                                                  str))
+                                                        InputBlobDefinition.FromString("blobInputString",
+                                                                                       str))
                                              .WithOutput("outputString",
-                                                         BlobDefinition.CreateOutput("blobOutputString")
-                                                                       .WithCallback(callback))
+                                                         OutputBlobDefinition.CreateOutput("blobOutputString")
+                                                                             .WithCallback(callback))
                                              .WithTaskOptions(TaskConfiguration!);
     SessionHandle!.Submit([taskDefinition]);
 
@@ -89,11 +89,11 @@ public class TaskSdkClient : ClientBase
     var callback = new Callback();
     var taskDefinition = new TaskDefinition().WithLibrary(WorkerLibrary!)
                                              .WithInput("inputString",
-                                                        BlobDefinition.FromString("blobInputString",
-                                                                                  "Hello!"))
+                                                        InputBlobDefinition.FromString("blobInputString",
+                                                                                       "Hello!"))
                                              .WithOutput("outputString",
-                                                         BlobDefinition.CreateOutput("blobOutputString")
-                                                                       .WithCallback(callback))
+                                                         OutputBlobDefinition.CreateOutput("blobOutputString")
+                                                                             .WithCallback(callback))
                                              .WithTaskOptions(TaskConfiguration!);
     var taskInfo = await Client!.TasksService.SubmitTasksAsync(SessionHandle!,
                                                                [taskDefinition])
@@ -164,11 +164,11 @@ public class TaskSdkClient : ClientBase
     {
       taskDefinitions.Add(new TaskDefinition().WithLibrary(WorkerLibrary!)
                                               .WithInput("inputString",
-                                                         BlobDefinition.FromString("blobInputString" + i,
-                                                                                   str))
+                                                         InputBlobDefinition.FromString("blobInputString" + i,
+                                                                                        str))
                                               .WithOutput("outputString",
-                                                          BlobDefinition.CreateOutput("blobOutputString" + i)
-                                                                        .WithCallback(new Callback()))
+                                                          OutputBlobDefinition.CreateOutput("blobOutputString" + i)
+                                                                              .WithCallback(new Callback()))
                                               .WithTaskOptions(TaskConfiguration!));
     }
 

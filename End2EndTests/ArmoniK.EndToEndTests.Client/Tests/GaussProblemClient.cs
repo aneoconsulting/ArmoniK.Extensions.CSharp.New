@@ -46,13 +46,13 @@ public class GaussProblemClient : ClientBase
     var task = new TaskDefinition().WithLibrary(WorkerLibrary!)
                                    .WithTaskOptions(TaskConfiguration!)
                                    .WithOutput("result",
-                                               BlobDefinition.CreateOutput("resultBlob")
-                                                             .WithCallback(callback));
+                                               OutputBlobDefinition.CreateOutput("resultBlob")
+                                                                   .WithCallback(callback));
     for (var i = 1; i <= N; i++)
     {
       task.WithInput("blob" + i,
-                     BlobDefinition.FromString("input" + 1,
-                                               i.ToString()));
+                     InputBlobDefinition.FromString("input" + 1,
+                                                    i.ToString()));
     }
 
     SessionHandle!.Submit(task);

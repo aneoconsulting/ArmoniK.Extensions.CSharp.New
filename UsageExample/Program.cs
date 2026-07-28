@@ -99,10 +99,10 @@ internal class Program
 
     var task = new TaskDefinition().WithLibrary(dynamicLib)
                                    .WithInput("name",
-                                              BlobDefinition.FromString("name",
-                                                                        name))
+                                              InputBlobDefinition.FromString("name",
+                                                                             name))
                                    .WithOutput("helloResult",
-                                               BlobDefinition.CreateOutput("Result"))
+                                               OutputBlobDefinition.CreateOutput("Result"))
                                    .WithTaskOptions(defaultTaskOptions);
 
     var taskHandle = sessionHandle.Submit(task,

@@ -44,11 +44,11 @@ internal class CheckBlobCreationResponseOrderClient : ClientBase
     foreach (var city in cities)
     {
       taskDefinition.WithInput(city,
-                               BlobDefinition.FromString(city,
-                                                         city))
+                               InputBlobDefinition.FromString(city,
+                                                              city))
                     .WithOutput(city,
-                                BlobDefinition.CreateOutput(city)
-                                              .WithCallback(new Callback()));
+                                OutputBlobDefinition.CreateOutput(city)
+                                                    .WithCallback(new Callback()));
     }
 
     SessionHandle!.Submit(taskDefinition);

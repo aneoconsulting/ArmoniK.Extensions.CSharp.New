@@ -18,31 +18,30 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.CompilerServices;
-using System.Text;
 using System.Threading;
 
-using ArmoniK.Extensions.CSharp.Client.Exceptions;
 using ArmoniK.Extensions.CSharp.Client.Handles;
 
 namespace ArmoniK.Extensions.CSharp.Client.Common.Domain.Blob;
 
 /// <summary>
-///   Description of a blob that serve to its creation
+///   Description of a blob that serve to its creation. Only <see cref="InputBlobDefinition" /> and
+///   <see cref="OutputBlobDefinition" /> may derive from this class.
 /// </summary>
-public class BlobDefinition
+public abstract class BlobDefinition
 {
-  private readonly FileInfo?             file_;
-  private          BlobHandle?           blobHandle_;
-  private          long                  dataSize_;
-  private          ReadOnlyMemory<byte>? data_;
+  private readonly  FileInfo?             file_;
+  private protected BlobHandle?           blobHandle_;
+  private           long                  dataSize_;
+  private           ReadOnlyMemory<byte>? data_;
 
   /// <summary>
   ///   Creation of a blob definition with known data
   /// </summary>
   /// <param name="name">The blob name</param>
   /// <param name="content">The blob data</param>
-  private BlobDefinition(string               name,
-                         ReadOnlyMemory<byte> content)
+  private protected BlobDefinition(string               name,
+                                   ReadOnlyMemory<byte> content)
   {
     Name      = name;
     data_     = content;
@@ -56,8 +55,8 @@ public class BlobDefinition
   /// </summary>
   /// <param name="name">The blob name</param>
   /// <param name="file">The FileInfo instance</param>
-  private BlobDefinition(string   name,
-                         FileInfo file)
+  private protected BlobDefinition(string   name,
+                                   FileInfo file)
   {
     Name      = name;
     data_     = null;
@@ -70,7 +69,7 @@ public class BlobDefinition
   ///   Creation of a blob definition with no data
   /// </summary>
   /// <param name="name">The blob name</param>
-  private BlobDefinition(string name)
+  private protected BlobDefinition(string name)
   {
     Name      = name;
     data_     = null;
@@ -284,14 +283,6 @@ public class BlobDefinition
   }
 
   /// <summary>
-  ///   Create an output blob definition
-  /// </summary>
-  /// <param name="name">The blob name</param>
-  /// <returns>The newly created blob definition</returns>
-  public static BlobDefinition CreateOutput(string name)
-    => new(name);
-
-  /// <summary>
   ///   Set the blob as to be manually deleted
   /// </summary>
   /// <returns>The updated BlobDefinition</returns>
@@ -311,76 +302,4 @@ public class BlobDefinition
     CallBack = callBack;
     return this;
   }
-
-  /// <summary>
-  ///   Creates a BlobDefinition from a blob handle. The handle must already be resolved (i.e. reference an
-  ///   existing blob), since the blob's name is required immediately.
-  /// </summary>
-  /// <param name="handle">The blob handle</param>
-  /// <returns>The newly created blob definition</returns>
-  /// <exception cref="ArmoniKSdkException">Thrown when the handle is not resolved yet.</exception>
-  public static BlobDefinition FromBlobHandle(BlobHandle handle)
-  {
-    var blobInfo = handle.ResolvedBlobInfoOrNull ?? throw new ArmoniKSdkException("The blob handle must be resolved before it can be used to create a BlobDefinition.");
-    var definition = new BlobDefinition(blobInfo.BlobName)
-                     {
-                       blobHandle_ = handle,
-                     };
-    return definition;
-  }
-
-  /// <summary>
-  ///   Creates a BlobDefinition from a file
-  /// </summary>
-  /// <param name="blobName">The blob name</param>
-  /// <param name="filePath">The file containing the data</param>
-  /// <returns>The newly created blob definition</returns>
-  public static BlobDefinition FromFile(string blobName,
-                                        string filePath)
-  {
-    var file = new FileInfo(filePath);
-    if (!file.Exists)
-    {
-      throw new ArmoniKSdkException($"The file {file.FullName} does not exists.");
-    }
-
-    return new BlobDefinition(blobName,
-                              file);
-  }
-
-  /// <summary>
-  ///   Creates a BlobDefinition from a string
-  /// </summary>
-  /// <param name="blobName">The blob name</param>
-  /// <param name="content">The raw data</param>
-  /// <param name="encoding">The encoding used for the string, when null UTF-8 is used</param>
-  /// <returns>The newly created blob definition</returns>
-  public static BlobDefinition FromString(string    blobName,
-                                          string    content,
-                                          Encoding? encoding = null)
-    => new(blobName,
-           (encoding ?? Encoding.UTF8).GetBytes(content)
-                                      .AsMemory());
-
-  /// <summary>
-  ///   Creates a BlobDefinition from a read only memory
-  /// </summary>
-  /// <param name="blobName">The blob name</param>
-  /// <param name="content">The raw data</param>
-  /// <returns>The newly created blob definition</returns>
-  public static BlobDefinition FromReadOnlyMemory(string               blobName,
-                                                  ReadOnlyMemory<byte> content)
-    => new(blobName,
-           content);
-
-  /// <summary>
-  ///   Creates a BlobDefinition from a byte array
-  /// </summary>
-  /// <param name="blobName">The blob name</param>
-  /// <param name="content">The raw data</param>
-  /// <returns>The newly created blob definition</returns>
-  public static BlobDefinition FromByteArray(string blobName,
-                                             byte[] content)
-    => new(blobName,
-           content);
 }
