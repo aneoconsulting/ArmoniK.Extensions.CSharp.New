@@ -29,7 +29,6 @@ using ArmoniK.Extensions.CSharp.Client.Common.Domain.Session;
 using ArmoniK.Extensions.CSharp.Client.Common.Enum;
 using ArmoniK.Extensions.CSharp.Client.Common.Services;
 using ArmoniK.Extensions.CSharp.Client.Exceptions;
-using ArmoniK.Extensions.CSharp.Client.Handles;
 using ArmoniK.Extensions.CSharp.Client.Queryable;
 using ArmoniK.Extensions.CSharp.Client.Queryable.BlobStateQuery;
 using ArmoniK.Extensions.CSharp.Common.Common.Domain.Blob;
@@ -455,12 +454,17 @@ public class BlobService : IBlobService
     using var stream = blobClient.UploadResultData(cancellationToken: cancellationToken);
     try
     {
+      // The blob's metadata (and hence its id) must already be known by this point: either the blob was
+      // already resolved on a previous call, or its metadata was just created by CreateBlobsMetadataAsync().
+      var blobInfo = blobDefinition.BlobHandle!.ResolvedBlobInfoOrNull ??
+                     throw new
+                       ArmoniKSdkException($"The blob '{blobDefinition.Name}' has no known id yet, its metadata must be created before uploading its data by chunk.");
       await stream.RequestStream.WriteAsync(new UploadResultDataRequest
                                             {
                                               Id = new UploadResultDataRequest.Types.ResultIdentifier
                                                    {
-                                                     ResultId  = blobDefinition.BlobHandle!.BlobInfo.BlobId,
-                                                     SessionId = blobDefinition.BlobHandle!.BlobInfo.SessionId,
+                                                     ResultId  = blobInfo.BlobId,
+                                                     SessionId = blobInfo.SessionId,
                                                    },
                                             })
                   .ConfigureAwait(false);
@@ -530,14 +534,48 @@ public class BlobService : IBlobService
                                      IEnumerable<BlobDefinition> blobDefinitions,
                                      CancellationToken           cancellationToken = default)
   {
+    var definitions = blobDefinitions as ICollection<BlobDefinition> ?? blobDefinitions.ToList();
+    foreach (var blobDefinition in definitions)
+    {
+      // Ensure every definition has a (possibly pending) handle, covering callers that bypass
+      // SessionHandle.Submit() (which already creates it eagerly).
+      blobDefinition.EnsureBlobHandle(armoniKClient_);
+    }
+
+    try
+    {
+      await CreateBlobsCoreAsync(session,
+                                 definitions,
+                                 cancellationToken)
+        .ConfigureAwait(false);
+    }
+    catch (Exception ex)
+    {
+      // Make sure no caller is left awaiting a handle that will never resolve: every handle in this
+      // call that isn't already resolved transitions to a faulted state (idempotent, safe no-op for
+      // already-resolved ones).
+      foreach (var blobDefinition in definitions)
+      {
+        blobDefinition.BlobHandle?.BlobInfoSource?.TrySetException(ex);
+      }
+
+      throw;
+    }
+  }
+
+  private async Task CreateBlobsCoreAsync(SessionInfo                 session,
+                                          IEnumerable<BlobDefinition> blobDefinitions,
+                                          CancellationToken           cancellationToken)
+  {
     var blobsWithData    = new List<BlobDefinition>();
     var blobsWithoutData = new List<BlobDefinition>();
 
     foreach (var blobDefinition in blobDefinitions)
     {
-      if (blobDefinition.BlobHandle != null)
+      var resolvedBlobInfo = blobDefinition.BlobHandle!.ResolvedBlobInfoOrNull;
+      if (resolvedBlobInfo != null)
       {
-        if (blobDefinition.BlobHandle.BlobInfo.SessionId == session.SessionId)
+        if (resolvedBlobInfo.SessionId == session.SessionId)
         {
           // The blob was already created on this session, then we skip it
           continue;
@@ -547,7 +585,7 @@ public class BlobService : IBlobService
         {
           // The blob was created on another session, and we do not have its data.
           throw new
-            ArmoniKSdkException($"The blob '{blobDefinition.BlobHandle.BlobInfo.BlobName}' (BlobId:{blobDefinition.BlobHandle.BlobInfo.BlobId}) was created on session '{blobDefinition.BlobHandle.BlobInfo.SessionId}' and cannot be used on session '{session.SessionId}'");
+            ArmoniKSdkException($"The blob '{resolvedBlobInfo.BlobName}' (BlobId:{resolvedBlobInfo.BlobId}) was created on session '{resolvedBlobInfo.SessionId}' and cannot be used on session '{session.SessionId}'");
         }
       }
 
@@ -627,8 +665,10 @@ public class BlobService : IBlobService
                                                 cancellationToken);
         await foreach (var blob in response.ConfigureAwait(false))
         {
-          name2Blob[blob.BlobName].BlobHandle = new BlobHandle(blob,
-                                                               armoniKClient_);
+          // TrySetResult (not SetResult): a blob whose size is above the chunking threshold is processed
+          // by both the metadata-creation section above and the content-upload section below, so this
+          // same handle may be resolved twice with an equivalent BlobInfo; the second call is then a no-op.
+          name2Blob[blob.BlobName].BlobHandle!.BlobInfoSource!.TrySetResult(blob);
         }
       }
     }
@@ -645,8 +685,10 @@ public class BlobService : IBlobService
                                                    cancellationToken);
         await foreach (var blob in response.ConfigureAwait(false))
         {
-          name2Blob[blob.BlobName].BlobHandle = new BlobHandle(blob,
-                                                               armoniKClient_);
+          // TrySetResult (not SetResult): a blob whose size is above the chunking threshold is processed
+          // by both the metadata-creation section above and the content-upload section below, so this
+          // same handle may be resolved twice with an equivalent BlobInfo; the second call is then a no-op.
+          name2Blob[blob.BlobName].BlobHandle!.BlobInfoSource!.TrySetResult(blob);
         }
       }
     }
@@ -711,7 +753,8 @@ public class BlobService : IBlobService
         await UploadBlobByChunkAsync(blobDefinition,
                                      cancellationToken: cancellationToken)
           .ConfigureAwait(false);
-        yield return blobDefinition.BlobHandle!;
+        // The metadata (and hence the BlobInfo) was already created earlier, by CreateBlobsMetadataAsync().
+        yield return blobDefinition.BlobHandle!.ResolvedBlobInfoOrNull!;
       }
       else
       {

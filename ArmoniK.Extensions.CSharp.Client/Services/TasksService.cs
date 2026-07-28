@@ -197,12 +197,23 @@ public class TasksService : ITasksService
     var tasksOutputs = new List<IEnumerable<KeyValuePair<string, string>>>();
     foreach (var task in taskDefinitions)
     {
-      var inputs = task.InputDefinitions.Select(i => new KeyValuePair<string, string>(i.Key,
-                                                                                      i.Value.BlobHandle!.BlobInfo.BlobId))
-                       .ToList();
-      var outputs = task.Outputs.Select(o => new KeyValuePair<string, string>(o.Key,
-                                                                              o.Value.BlobHandle!.BlobInfo.BlobId))
-                        .ToList();
+      var inputs = new List<KeyValuePair<string, string>>();
+      foreach (var i in task.InputDefinitions)
+      {
+        var blobInfo = await i.Value.BlobHandle!.GetBlobInfoAsync()
+                              .ConfigureAwait(false);
+        inputs.Add(new KeyValuePair<string, string>(i.Key,
+                                                    blobInfo.BlobId));
+      }
+
+      var outputs = new List<KeyValuePair<string, string>>();
+      foreach (var o in task.Outputs)
+      {
+        var blobInfo = await o.Value.BlobHandle!.GetBlobInfoAsync()
+                              .ConfigureAwait(false);
+        outputs.Add(new KeyValuePair<string, string>(o.Key,
+                                                     blobInfo.BlobId));
+      }
 
       var payload = new Payload(inputs.ToDictionary(b => b.Key,
                                                     b => b.Value),
@@ -236,7 +247,8 @@ public class TasksService : ITasksService
     {
       taskEnumerator.MoveNext();
       var task = taskEnumerator.Current;
-      task!.Payload                                                      = payloadBlobHandle!;
+      task!.Payload = await payloadBlobHandle!.GetBlobInfoAsync()
+                                              .ConfigureAwait(false);
       task.TaskOptions.Options[nameof(DynamicLibrary.ConventionVersion)] = DynamicLibrary.ConventionVersion;
       var dataDependencies = tasksInputs[index]
         .Select(i => i.Value);

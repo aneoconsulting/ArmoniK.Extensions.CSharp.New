@@ -62,12 +62,13 @@ internal class FailingTaskClient : ClientBase
 
     public bool Aborted { get; private set; }
 
-    public ValueTask OnSuccessAsync(BlobHandle        blob,
-                                    byte[]            rawData,
-                                    CancellationToken cancellationToken)
+    public async ValueTask OnSuccessAsync(BlobHandle        blob,
+                                          byte[]            rawData,
+                                          CancellationToken cancellationToken)
     {
-      Assert.Fail($"blob {blob.BlobInfo.BlobId} expected to be aborted");
-      return ValueTask.CompletedTask;
+      var blobInfo = await blob.GetBlobInfoAsync()
+                               .ConfigureAwait(false);
+      Assert.Fail($"blob {blobInfo.BlobId} expected to be aborted");
     }
 
     public async ValueTask OnErrorAsync(BlobHandle        blob,

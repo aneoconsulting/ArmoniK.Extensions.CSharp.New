@@ -43,14 +43,16 @@ public class BlobHandleTests
   private BlobInfo?            mockBlobInfo_;
 
   [Test]
-  public void ConstructorWithBlobInfosShouldInitializeProperties()
+  public async Task ConstructorWithBlobInfosShouldInitializeProperties()
   {
     var blobHandle = new BlobHandle(mockBlobInfo_!,
                                     mockedArmoniKClient_!);
 
+    var blobInfo = await blobHandle.GetBlobInfoAsync();
+
     Assert.Multiple(() =>
                     {
-                      Assert.That(blobHandle.BlobInfo,
+                      Assert.That(blobInfo,
                                   Is.EqualTo(mockBlobInfo_));
                       Assert.That(blobHandle.ArmoniKClient,
                                   Is.Not.Null);
@@ -60,7 +62,7 @@ public class BlobHandleTests
   }
 
   [Test]
-  public void ConstructorWithIndividualParametersShouldInitializeCorrectly()
+  public async Task ConstructorWithIndividualParametersShouldInitializeCorrectly()
   {
     var blobName  = "myBlob";
     var blobId    = "myId";
@@ -71,13 +73,15 @@ public class BlobHandleTests
                                     sessionId,
                                     mockedArmoniKClient_!);
 
+    var blobInfo = await blobHandle.GetBlobInfoAsync();
+
     Assert.Multiple(() =>
                     {
-                      Assert.That(blobHandle.BlobInfo.BlobName,
+                      Assert.That(blobInfo.BlobName,
                                   Is.EqualTo(blobName));
-                      Assert.That(blobHandle.BlobInfo.BlobId,
+                      Assert.That(blobInfo.BlobId,
                                   Is.EqualTo(blobId));
-                      Assert.That(blobHandle.BlobInfo.SessionId,
+                      Assert.That(blobInfo.SessionId,
                                   Is.EqualTo(sessionId));
                       Assert.That(blobHandle.ArmoniKClient,
                                   Is.Not.Null);
@@ -99,39 +103,71 @@ public class BlobHandleTests
                          .EqualTo("armoniKClient"));
 
   [Test]
-  public void ImplicitConversionToBlobInfoShouldReturnCorrectBlobInfo()
+  public void ResolvedHandleGetBlobInfoAsyncCompletesSynchronously()
   {
     var blobHandle = new BlobHandle(mockBlobInfo_!,
                                     mockedArmoniKClient_!);
 
-    BlobInfo convertedBlobInfo = blobHandle;
+    var valueTask = blobHandle.GetBlobInfoAsync();
 
-    Assert.That(convertedBlobInfo,
+    Assert.Multiple(() =>
+                    {
+                      Assert.That(valueTask.IsCompletedSuccessfully,
+                                  Is.True);
+                      Assert.That(valueTask.Result,
+                                  Is.EqualTo(mockBlobInfo_));
+                    });
+  }
+
+  [Test]
+  public void PendingHandleGetBlobInfoAsyncDoesNotCompleteBeforeResolution()
+  {
+    var blobHandle = new BlobHandle(mockedArmoniKClient_!);
+
+    var task = blobHandle.GetBlobInfoAsync()
+                         .AsTask();
+
+    Assert.That(task.IsCompleted,
+                Is.False);
+  }
+
+  [Test]
+  public async Task PendingHandleGetBlobInfoAsyncCompletesOnceResolved()
+  {
+    var blobHandle = new BlobHandle(mockedArmoniKClient_!);
+
+    var task = blobHandle.GetBlobInfoAsync()
+                         .AsTask();
+
+    blobHandle.BlobInfoSource!.SetResult(mockBlobInfo_!);
+
+    var blobInfo = await task;
+
+    Assert.That(blobInfo,
                 Is.EqualTo(mockBlobInfo_));
   }
 
   [Test]
-  public void ImplicitConversionToBlobInfoThrowsArgumentNullExceptionWhenHandleIsNull()
+  public void PendingHandleGetBlobInfoAsyncFaultsWhenFailed()
   {
-    BlobHandle? nullHandle = null;
+    var blobHandle = new BlobHandle(mockedArmoniKClient_!);
 
-    Assert.That(() =>
-                {
-                  BlobInfo _ = nullHandle!;
-                },
-                Throws.ArgumentNullException.With.Property(nameof(ArgumentNullException.ParamName))
-                      .EqualTo("blobHandle"));
+    var task = blobHandle.GetBlobInfoAsync()
+                         .AsTask();
+
+    var expectedException = new InvalidOperationException("blob creation failed");
+    blobHandle.BlobInfoSource!.SetException(expectedException);
+
+    Assert.That(async () => await task,
+                Throws.InvalidOperationException.With.Message.EqualTo(expectedException.Message));
   }
 
   [Test]
-  public void ImplicitConversionWorksInMethodParameters()
+  public void PendingHandleResolvedBlobInfoOrNullIsNullBeforeResolution()
   {
-    var blobHandle = new BlobHandle(mockBlobInfo_!,
-                                    mockedArmoniKClient_!);
+    var blobHandle = new BlobHandle(mockedArmoniKClient_!);
 
-    // we make sure that we can use BlobHandle where BlobInfo is expected
-    Assert.That(() => Assert.That(blobHandle,
-                                  Is.Not.Null),
-                Throws.Nothing);
+    Assert.That(blobHandle.ResolvedBlobInfoOrNull,
+                Is.Null);
   }
 }
