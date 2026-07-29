@@ -37,23 +37,14 @@ public interface ISdkTaskHandler
   TaskConfiguration TaskOptions { get; }
 
   /// <summary>
-  ///   The data required to compute the task. The key is the name defined by the client, the value is the raw data.
+  ///   The data required to compute the task. The key is the name defined by the client.
   /// </summary>
-  public IReadOnlyDictionary<string, BlobHandle> Inputs { get; }
+  public IReadOnlyDictionary<string, TaskInput> Inputs { get; }
 
   /// <summary>
-  ///   Result blob ids by name defined by the client.
+  ///   The task's expected outputs. The key is the name defined by the client.
   /// </summary>
-  public IReadOnlyDictionary<string, BlobHandle> Outputs { get; }
-
-  /// <summary>
-  ///   Decode a dependency from its raw data
-  /// </summary>
-  /// <param name="name">The input name defined by the client</param>
-  /// <param name="encoding">Encoding used for the string, when null UTF-8 is used</param>
-  /// <returns>The decoded string</returns>
-  string GetStringDependency(string    name,
-                             Encoding? encoding = null);
+  public IReadOnlyDictionary<string, TaskOutput> Outputs { get; }
 
   /// <summary>Send the results computed by the task</summary>
   /// <param name="blob">The blob handle.</param>

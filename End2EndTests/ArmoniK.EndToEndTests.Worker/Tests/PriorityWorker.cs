@@ -34,11 +34,12 @@ public class PriorityWorker : IWorker
   {
     try
     {
-      var priority  = taskHandler.GetStringDependency("Priority");
+      var priority = taskHandler.Inputs["Priority"]
+                                .GetStringData();
       var strResult = $"Payload is {priority} and TaskOptions.Priority is {taskHandler.TaskOptions.Priority}";
 
       var result = taskHandler.Outputs.Single()
-                              .Value;
+                              .Value.AsBlobHandle();
       logger.LogInformation($"Sending result: {strResult}. Task Id: {taskHandler.TaskId}");
       await taskHandler.SendResultAsync(result,
                                         Encoding.ASCII.GetBytes(strResult))

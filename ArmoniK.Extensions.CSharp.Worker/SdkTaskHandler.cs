@@ -45,11 +45,11 @@ internal class SdkTaskHandler : ISdkTaskHandler
   ///   Creates a SdkTaskHandler
   /// </summary>
   /// <param name="taskHandler">The task handler</param>
-  /// <param name="inputs">The inputs with the task input name as Key, and BlobHandle as value</param>
-  /// <param name="outputs">The outputs with the task output name as Key, and BlobHandle as value</param>
+  /// <param name="inputs">The inputs with the task input name as Key</param>
+  /// <param name="outputs">The outputs with the task output name as Key</param>
   public SdkTaskHandler(ITaskHandler                            taskHandler,
-                        IReadOnlyDictionary<string, BlobHandle> inputs,
-                        IReadOnlyDictionary<string, BlobHandle> outputs)
+                        IReadOnlyDictionary<string, TaskInput>  inputs,
+                        IReadOnlyDictionary<string, TaskOutput> outputs)
   {
     taskHandler_ = taskHandler;
     Inputs       = inputs;
@@ -69,24 +69,14 @@ internal class SdkTaskHandler : ISdkTaskHandler
     => taskHandler_.TaskId;
 
   /// <summary>
-  ///   The data required to compute the task. The key is the name defined by the client, the value is the raw data.
+  ///   The data required to compute the task. The key is the name defined by the client.
   /// </summary>
-  public IReadOnlyDictionary<string, BlobHandle> Inputs { get; }
+  public IReadOnlyDictionary<string, TaskInput> Inputs { get; }
 
   /// <summary>
-  ///   Result blob ids by name defined by the client.
+  ///   The task's expected outputs. The key is the name defined by the client.
   /// </summary>
-  public IReadOnlyDictionary<string, BlobHandle> Outputs { get; }
-
-  /// <summary>
-  ///   Decode a dependency from its raw data
-  /// </summary>
-  /// <param name="name">The input name defined by the client</param>
-  /// <param name="encoding">The encoding used for the string, when null UTF-8 is used</param>
-  /// <returns>The decoded string</returns>
-  public string GetStringDependency(string    name,
-                                    Encoding? encoding = null)
-    => (encoding ?? Encoding.UTF8).GetString(Inputs[name].Data!);
+  public IReadOnlyDictionary<string, TaskOutput> Outputs { get; }
 
   /// <summary>
   ///   Create blobs metadata
