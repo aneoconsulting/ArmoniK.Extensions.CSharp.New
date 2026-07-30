@@ -43,8 +43,8 @@ public class BlobDefinitionTests
   [Test]
   public async Task TestBlobFile1()
   {
-    var blob = BlobDefinition.FromFile("file1",
-                                       testFileName_);
+    var blob = InputBlobDefinition.FromFile("file1",
+                                            testFileName_);
     blob.RefreshFile();
     var result = await blob.GetDataAsync()
                            .SingleAsync()
@@ -57,8 +57,8 @@ public class BlobDefinitionTests
   [Test]
   public async Task TestBlobFile2()
   {
-    var blob = BlobDefinition.FromFile("file1",
-                                       testFileName_);
+    var blob = InputBlobDefinition.FromFile("file1",
+                                            testFileName_);
     blob.RefreshFile();
     var globalBytes = new List<byte>();
     await foreach (var result in blob.GetDataAsync(30)
@@ -74,8 +74,8 @@ public class BlobDefinitionTests
   [Test]
   public async Task TestBlobFile3()
   {
-    var blob = BlobDefinition.FromFile("file1",
-                                       testFileName_);
+    var blob = InputBlobDefinition.FromFile("file1",
+                                            testFileName_);
     blob.RefreshFile();
     var result = await blob.GetDataAsync(200)
                            .SingleAsync()

@@ -38,11 +38,11 @@ internal class FailingTaskClient : ClientBase
     var callback = new Callback(SessionHandle!);
     var taskDefinition = new TaskDefinition().WithLibrary(WorkerLibrary!)
                                              .WithInput("inputString",
-                                                        BlobDefinition.FromString("blobInputString",
-                                                                                  "Hello world!"))
+                                                        InputBlobDefinition.FromString("blobInputString",
+                                                                                       "Hello world!"))
                                              .WithOutput("outputString",
-                                                         BlobDefinition.CreateOutput("blobOutputString")
-                                                                       .WithCallback(callback))
+                                                         OutputBlobDefinition.CreateOutput("blobOutputString")
+                                                                             .WithCallback(callback))
                                              .WithTaskOptions(TaskConfiguration!);
     SessionHandle!.Submit([taskDefinition]);
 
