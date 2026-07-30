@@ -22,7 +22,6 @@ using ArmoniK.Extensions.CSharp.Client.Common;
 using ArmoniK.Extensions.CSharp.Client.Common.Domain.Blob;
 using ArmoniK.Extensions.CSharp.Client.Common.Domain.Task;
 using ArmoniK.Extensions.CSharp.Client.Services;
-using ArmoniK.Extensions.CSharp.Common.Common.Domain.Blob;
 using ArmoniK.Extensions.CSharp.Common.Common.Domain.Task;
 using ArmoniK.Extensions.CSharp.Common.Library;
 
@@ -111,8 +110,9 @@ internal class Program
     var taskInfo = await taskHandle.GetTaskInfosAsync()
                                    .ConfigureAwait(false);
 
-    BlobInfo resultBlobInfo = task.Outputs.Values.First()
-                                  .BlobHandle!;
+    var resultBlobInfo = await task.Outputs.Values.First()
+                                   .BlobHandle!.GetBlobInfoAsync()
+                                   .ConfigureAwait(false);
     logger.LogInformation("resultId: {ResultId}",
                           resultBlobInfo.BlobId);
     logger.LogInformation("taskId: {TaskId}",

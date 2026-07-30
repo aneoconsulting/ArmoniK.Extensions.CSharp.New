@@ -32,6 +32,7 @@ namespace ArmoniK.Extensions.CSharp.Client.Common.Domain.Blob;
 public class BlobDefinition
 {
   private readonly FileInfo?             file_;
+  private          BlobHandle?           blobHandle_;
   private          long                  dataSize_;
   private          ReadOnlyMemory<byte>? data_;
 
@@ -107,9 +108,11 @@ public class BlobDefinition
   public bool HasData { get; init; }
 
   /// <summary>
-  ///   Handle once the blob has been registered
+  ///   Handle once the blob has been registered. It is created (in a pending state) as soon as the blob definition
+  ///   is attached to a submission, and resolved once the blob is actually created server-side; null before that.
   /// </summary>
-  public BlobHandle? BlobHandle { get; internal set; }
+  public BlobHandle? BlobHandle
+    => blobHandle_;
 
   /// <summary>
   ///   Indicates whether the blob may be a pipe,
@@ -117,6 +120,27 @@ public class BlobDefinition
   /// </summary>
   internal bool MayBeAPipe
     => dataSize_ == 0 && file_ != null;
+
+  /// <summary>
+  ///   Ensures a <see cref="Handles.BlobHandle" /> exists for this definition, creating a pending one if needed.
+  ///   Idempotent and safe to call concurrently: only one <see cref="Handles.BlobHandle" /> instance ever wins.
+  /// </summary>
+  /// <param name="armoniKClient">The ArmoniK client to associate the pending handle with.</param>
+  /// <returns>The existing or newly created <see cref="Handles.BlobHandle" />.</returns>
+  internal BlobHandle EnsureBlobHandle(ArmoniKClient armoniKClient)
+  {
+    var existing = blobHandle_;
+    if (existing != null)
+    {
+      return existing;
+    }
+
+    var pending = new BlobHandle(armoniKClient);
+    var winner = Interlocked.CompareExchange(ref blobHandle_,
+                                             pending,
+                                             null);
+    return winner ?? pending;
+  }
 
   /// <summary>
   ///   Fetch the last state the file, whenever the blob comes from a file.
@@ -289,15 +313,21 @@ public class BlobDefinition
   }
 
   /// <summary>
-  ///   Creates a BlobDefinition from a blob handle
+  ///   Creates a BlobDefinition from a blob handle. The handle must already be resolved (i.e. reference an
+  ///   existing blob), since the blob's name is required immediately.
   /// </summary>
   /// <param name="handle">The blob handle</param>
   /// <returns>The newly created blob definition</returns>
+  /// <exception cref="ArmoniKSdkException">Thrown when the handle is not resolved yet.</exception>
   public static BlobDefinition FromBlobHandle(BlobHandle handle)
-    => new(handle.BlobInfo.BlobName)
-       {
-         BlobHandle = handle,
-       };
+  {
+    var blobInfo = handle.ResolvedBlobInfoOrNull ?? throw new ArmoniKSdkException("The blob handle must be resolved before it can be used to create a BlobDefinition.");
+    var definition = new BlobDefinition(blobInfo.BlobName)
+                     {
+                       blobHandle_ = handle,
+                     };
+    return definition;
+  }
 
   /// <summary>
   ///   Creates a BlobDefinition from a file

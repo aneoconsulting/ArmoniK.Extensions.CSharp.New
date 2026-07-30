@@ -36,13 +36,19 @@ public class BlobHandle
   public readonly ArmoniKClient ArmoniKClient;
 
   /// <summary>
-  ///   The blob containing name, session ID, and blob ID.
+  ///   Promise of the BlobInfo once the blob has actually been created.
+  ///   It needs to be volatile as we need it to play the role of a barrier in GetBlobInfoAsync().
   /// </summary>
-  public readonly BlobInfo BlobInfo;
+  private volatile TaskCompletionSource<BlobInfo>? blobInfoSource_;
+
+  /// <summary>
+  ///   The blob info once it is known.
+  /// </summary>
+  private BlobInfo? blobInfo_;
 
   /// <summary>
   ///   Initializes a new instance of the <see cref="BlobHandle" /> class with specified blob information and an ArmoniK
-  ///   client.
+  ///   client. The handle is already resolved.
   /// </summary>
   /// <param name="blobInfo">The information about the blob.</param>
   /// <param name="armoniKClient">The ArmoniK client used for performing blob operations.</param>
@@ -50,13 +56,13 @@ public class BlobHandle
                     ArmoniKClient armoniKClient)
 
   {
-    BlobInfo      = blobInfo      ?? throw new ArgumentNullException(nameof(blobInfo));
+    blobInfo_     = blobInfo      ?? throw new ArgumentNullException(nameof(blobInfo));
     ArmoniKClient = armoniKClient ?? throw new ArgumentNullException(nameof(armoniKClient));
   }
 
   /// <summary>
   ///   Initializes a new instance of the <see cref="BlobHandle" /> class with specified blob details and an ArmoniK
-  ///   client.
+  ///   client. The handle is already resolved.
   /// </summary>
   /// <param name="blobName">The name of the blob.</param>
   /// <param name="blobId">The identifier of the blob.</param>
@@ -67,25 +73,37 @@ public class BlobHandle
                     string        sessionId,
                     ArmoniKClient armoniKClient)
   {
-    BlobInfo = new BlobInfo
-               {
-                 BlobId    = blobId,
-                 BlobName  = blobName,
-                 SessionId = sessionId,
-               };
+    blobInfo_ = new BlobInfo
+                {
+                  BlobId    = blobId,
+                  BlobName  = blobName,
+                  SessionId = sessionId,
+                };
     ArmoniKClient = armoniKClient ?? throw new ArgumentNullException(nameof(armoniKClient));
   }
 
   /// <summary>
-  ///   Implicit conversion operator from BlobHandle to BlobInfo.
-  ///   Allows BlobHandle to be used wherever BlobInfo is expected.
+  ///   Initializes a new instance of the <see cref="BlobHandle" /> class that is not resolved yet.
+  ///   Its <see cref="BlobInfo" /> will be known once <see cref="BlobInfoSource" /> is completed.
   /// </summary>
-  /// <param name="blobHandle">The BlobHandle to convert.</param>
-  /// <returns>The BlobInfo contained within the BlobHandle.</returns>
-  /// <exception cref="ArgumentNullException">Thrown when blobHandle is null.</exception>
-  public static implicit operator BlobInfo(BlobHandle blobHandle)
-    => blobHandle?.BlobInfo ?? throw new ArgumentNullException(nameof(blobHandle));
+  /// <param name="armoniKClient">The ArmoniK client used for performing blob operations.</param>
+  internal BlobHandle(ArmoniKClient armoniKClient)
+  {
+    ArmoniKClient   = armoniKClient ?? throw new ArgumentNullException(nameof(armoniKClient));
+    blobInfoSource_ = new TaskCompletionSource<BlobInfo>(TaskCreationOptions.RunContinuationsAsynchronously);
+  }
 
+  /// <summary>
+  ///   The TaskCompletionSource valued once the blob has actually been created, null if the handle is already resolved.
+  /// </summary>
+  internal TaskCompletionSource<BlobInfo>? BlobInfoSource
+    => blobInfoSource_;
+
+  /// <summary>
+  ///   Whenever the handle is already resolved, returns its BlobInfo, null otherwise.
+  /// </summary>
+  internal BlobInfo? ResolvedBlobInfoOrNull
+    => blobInfo_;
 
   /// <summary>
   ///   Creates a BlobHandle from BlobInfo and ArmoniKClient.
@@ -100,14 +118,53 @@ public class BlobHandle
            armoniKClient ?? throw new ArgumentNullException(nameof(armoniKClient)));
 
   /// <summary>
+  ///   Asynchronously retrieves the BlobInfo of the blob, waiting for the blob to be created if necessary.
+  /// </summary>
+  /// <returns>A task representing the asynchronous operation. The task result contains the BlobInfo instance.</returns>
+  public ValueTask<BlobInfo> GetBlobInfoAsync()
+  {
+    var blobInfo = blobInfo_;
+    if (blobInfo is not null)
+    {
+      return new ValueTask<BlobInfo>(blobInfo);
+    }
+
+    return Core();
+
+    async ValueTask<BlobInfo> Core()
+    {
+      // volatile read of blobInfoSource_ here has acquire semantics and with the combination
+      // of the volatile write of blobInfoSource_ below, it ensures that if we see a null value for blobInfoSource_,
+      // we are guaranteed to see a non-null value for blobInfo_.
+      var tcs = blobInfoSource_;
+      if (tcs is null)
+      {
+        return blobInfo_!;
+      }
+
+      var resolvedBlobInfo = await tcs.Task.ConfigureAwait(false);
+      blobInfo_ = resolvedBlobInfo;
+      // volatile write of blobInfoSource_ here has release semantics (allows other threads to see the effects of preceding operations).
+      // This prevent the compiler to do some operation reordering, then we are sure blobInfo_ has actually been assigned when we reach that point
+      // therefore if a thread can see a null blobInfoSource_, it is guaranteed to see a non-null blobInfo_.
+      blobInfoSource_ = null;
+      return resolvedBlobInfo;
+    }
+  }
+
+  /// <summary>
   ///   Asynchronously retrieves the state of the blob.
   /// </summary>
   /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
   /// <returns>A task representing the asynchronous operation. The task result contains the blob state.</returns>
   public async Task<BlobState> GetBlobStateAsync(CancellationToken cancellationToken = default)
-    => await ArmoniKClient.BlobService.GetBlobStateAsync(this,
-                                                         cancellationToken)
-                          .ConfigureAwait(false);
+  {
+    var blobInfo = await GetBlobInfoAsync()
+                     .ConfigureAwait(false);
+    return await ArmoniKClient.BlobService.GetBlobStateAsync(blobInfo,
+                                                             cancellationToken)
+                              .ConfigureAwait(false);
+  }
 
   /// <summary>
   ///   Asynchronously downloads the data of the blob.
@@ -115,9 +172,13 @@ public class BlobHandle
   /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
   /// <returns>A task representing the asynchronous operation. The task result contains the blob content as a byte array.</returns>
   public async Task<byte[]> DownloadBlobDataAsync(CancellationToken cancellationToken)
-    => await ArmoniKClient.BlobService.DownloadBlobAsync(this,
-                                                         cancellationToken)
-                          .ConfigureAwait(false);
+  {
+    var blobInfo = await GetBlobInfoAsync()
+                     .ConfigureAwait(false);
+    return await ArmoniKClient.BlobService.DownloadBlobAsync(blobInfo,
+                                                             cancellationToken)
+                              .ConfigureAwait(false);
+  }
 
   /// <summary>
   ///   Asynchronously downloads the data of the blob in chunks.
@@ -126,7 +187,9 @@ public class BlobHandle
   /// <returns>An asynchronous enumerable of byte arrays representing the blob data chunks.</returns>
   public async IAsyncEnumerable<byte[]> DownloadBlobDataWithChunksAsync([EnumeratorCancellation] CancellationToken cancellationToken)
   {
-    await foreach (var chunk in ArmoniKClient.BlobService.DownloadBlobWithChunksAsync(this,
+    var blobInfo = await GetBlobInfoAsync()
+                     .ConfigureAwait(false);
+    await foreach (var chunk in ArmoniKClient.BlobService.DownloadBlobWithChunksAsync(blobInfo,
                                                                                       cancellationToken)
                                              .ConfigureAwait(false))
     {
@@ -142,9 +205,13 @@ public class BlobHandle
   /// <returns>A task representing the asynchronous operation.</returns>
   public async Task UploadBlobDataAsync(ReadOnlyMemory<byte> blobContent,
                                         CancellationToken    cancellationToken)
+  {
+    var blobInfo = await GetBlobInfoAsync()
+                     .ConfigureAwait(false);
     // Upload the blob chunk
-    => await ArmoniKClient.BlobService.UploadBlobAsync(this,
-                                                       blobContent,
-                                                       cancellationToken)
-                          .ConfigureAwait(false);
+    await ArmoniKClient.BlobService.UploadBlobAsync(blobInfo,
+                                                    blobContent,
+                                                    cancellationToken)
+                       .ConfigureAwait(false);
+  }
 }

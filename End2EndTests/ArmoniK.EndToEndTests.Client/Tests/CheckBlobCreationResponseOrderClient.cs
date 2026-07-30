@@ -58,7 +58,9 @@ internal class CheckBlobCreationResponseOrderClient : ClientBase
 
     foreach (var blob in taskDefinition.Outputs.Values)
     {
-      var name = blob.BlobHandle!.BlobInfo.BlobName;
+      var blobInfo = await blob.BlobHandle!.GetBlobInfoAsync()
+                               .ConfigureAwait(false);
+      var name = blobInfo.BlobName;
       var data = ((Callback)blob.CallBack!).Result;
       Assert.That(data,
                   Is.EqualTo(name));
@@ -77,12 +79,13 @@ internal class CheckBlobCreationResponseOrderClient : ClientBase
       return ValueTask.CompletedTask;
     }
 
-    public ValueTask OnErrorAsync(BlobHandle        blob,
-                                  Exception?        exception,
-                                  CancellationToken cancellationToken)
+    public async ValueTask OnErrorAsync(BlobHandle        blob,
+                                        Exception?        exception,
+                                        CancellationToken cancellationToken)
     {
-      Assert.Fail(exception?.Message ?? $"blob {blob.BlobInfo.BlobId} aborted");
-      return ValueTask.CompletedTask;
+      var blobInfo = await blob.GetBlobInfoAsync()
+                               .ConfigureAwait(false);
+      Assert.Fail(exception?.Message ?? $"blob {blobInfo.BlobId} aborted");
     }
   }
 }

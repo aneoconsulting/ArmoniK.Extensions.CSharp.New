@@ -67,11 +67,16 @@ public class TaskSdkClient : ClientBase
       resultString = Encoding.UTF8.GetString(callback.Result);
     }
 
+    var inputBlobInfo = await inputBlobHandle!.GetBlobInfoAsync()
+                                              .ConfigureAwait(false);
+    var outputBlobInfo = await outputBlobHandle!.GetBlobInfoAsync()
+                                                .ConfigureAwait(false);
+
     Assert.Multiple(() =>
                     {
-                      Assert.That(inputBlobHandle!.BlobInfo.BlobName,
+                      Assert.That(inputBlobInfo.BlobName,
                                   Is.EqualTo("blobInputString"));
-                      Assert.That(outputBlobHandle!.BlobInfo.BlobName,
+                      Assert.That(outputBlobInfo.BlobName,
                                   Is.EqualTo("blobOutputString"));
                       Assert.That(resultString,
                                   Is.EqualTo(str));
@@ -193,12 +198,13 @@ public class TaskSdkClient : ClientBase
       return ValueTask.CompletedTask;
     }
 
-    public ValueTask OnErrorAsync(BlobHandle        blob,
-                                  Exception?        exception,
-                                  CancellationToken cancellationToken)
+    public async ValueTask OnErrorAsync(BlobHandle        blob,
+                                        Exception?        exception,
+                                        CancellationToken cancellationToken)
     {
-      Assert.Fail(exception?.Message ?? $"blob {blob.BlobInfo.BlobId} aborted");
-      return ValueTask.CompletedTask;
+      var blobInfo = await blob.GetBlobInfoAsync()
+                               .ConfigureAwait(false);
+      Assert.Fail(exception?.Message ?? $"blob {blobInfo.BlobId} aborted");
     }
   }
 }

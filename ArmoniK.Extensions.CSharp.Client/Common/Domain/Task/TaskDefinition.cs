@@ -91,8 +91,9 @@ public class TaskDefinition
   {
     if (blobDeclaration.BlobHandle != null)
     {
+      var resolvedBlobInfo = blobDeclaration.BlobHandle.ResolvedBlobInfoOrNull;
       throw new
-        ArmoniKSdkException($"The task cannot take as output the already created blob '{blobDeclaration.BlobHandle.BlobInfo.BlobName}' with with BlobId '{blobDeclaration.BlobHandle.BlobInfo.BlobId}'");
+        ArmoniKSdkException($"The task cannot take as output the already created blob '{resolvedBlobInfo?.BlobName}' with with BlobId '{resolvedBlobInfo?.BlobId}'");
     }
 
     Outputs.Add(outputName,

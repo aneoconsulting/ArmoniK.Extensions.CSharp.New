@@ -79,12 +79,13 @@ public class GaussProblemClient : ClientBase
       return ValueTask.CompletedTask;
     }
 
-    public ValueTask OnErrorAsync(BlobHandle        blob,
-                                  Exception?        exception,
-                                  CancellationToken cancellationToken)
+    public async ValueTask OnErrorAsync(BlobHandle        blob,
+                                        Exception?        exception,
+                                        CancellationToken cancellationToken)
     {
-      Assert.Fail(exception?.Message ?? $"blob {blob.BlobInfo.BlobId} aborted");
-      return ValueTask.CompletedTask;
+      var blobInfo = await blob.GetBlobInfoAsync()
+                               .ConfigureAwait(false);
+      Assert.Fail(exception?.Message ?? $"blob {blobInfo.BlobId} aborted");
     }
   }
 }

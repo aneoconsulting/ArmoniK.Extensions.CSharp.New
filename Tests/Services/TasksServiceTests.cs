@@ -321,6 +321,9 @@ public class TasksServiceTests
                              .ConfigureAwait(false);
 
     var dependencyData = mock.GetBlobDataSent(dependency.blobName);
+    var dependencyBlobInfo = await taskDefinition.InputDefinitions.First()
+                                                 .Value.BlobHandle!.GetBlobInfoAsync()
+                                                 .ConfigureAwait(false);
 
     mock.CheckConfigureBlobCreationResponseCount();
     Assert.Multiple(() =>
@@ -332,8 +335,7 @@ public class TasksServiceTests
                                                    .DataDependencies.First()),
                                   "Expected data dependency blob ID to match.");
                       Assert.That(dependency.blobId,
-                                  Is.EqualTo(taskDefinition.InputDefinitions.First()
-                                                           .Value.BlobHandle!.BlobInfo.BlobId),
+                                  Is.EqualTo(dependencyBlobInfo.BlobId),
                                   "Expected data dependency blob ID in task definition to match.");
                     });
   }

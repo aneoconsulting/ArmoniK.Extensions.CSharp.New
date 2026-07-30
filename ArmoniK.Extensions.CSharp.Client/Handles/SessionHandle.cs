@@ -265,6 +265,8 @@ public class SessionHandle : IAsyncDisposable, IDisposable
   {
     _ = task ?? throw new ArgumentNullException(nameof(task));
 
+    EnsureBlobHandles(task);
+
     var backgroundSubmitter = CreateBackgroundSubmitterIfNeeded(cancellationToken);
     var taskHandle          = TaskHandle.FromTaskCompletionSourceOfTaskInfos(ArmoniKClient);
     backgroundSubmitter.Add(task,
@@ -288,12 +290,28 @@ public class SessionHandle : IAsyncDisposable, IDisposable
     var taskHandles         = new TaskHandle[tasks.Count];
     for (var i = 0; i < tasks.Count; i++)
     {
+      var task = tasks.ElementAt(i);
+      EnsureBlobHandles(task);
       taskHandles[i] = TaskHandle.FromTaskCompletionSourceOfTaskInfos(ArmoniKClient);
-      backgroundSubmitter.Add(tasks.ElementAt(i),
+      backgroundSubmitter.Add(task,
                               taskHandles[i]);
     }
 
     return taskHandles;
+  }
+
+  /// <summary>
+  ///   Creates a pending <see cref="BlobHandle" /> for every input and output blob definition of the task that
+  ///   doesn't already have one, so that callers can await it right after this method returns, well before the
+  ///   background submitter has actually processed the task.
+  /// </summary>
+  /// <param name="task">The task definition whose blob definitions should get a pending handle.</param>
+  private void EnsureBlobHandles(TaskDefinition task)
+  {
+    foreach (var blobDefinition in task.InputDefinitions.Values.Union(task.Outputs.Values))
+    {
+      blobDefinition.EnsureBlobHandle(ArmoniKClient);
+    }
   }
 
   private class BackgroundSubmitter : IAsyncDisposable
@@ -412,7 +430,8 @@ public class SessionHandle : IAsyncDisposable, IDisposable
             {
               foreach (var blob in blobsWithCallbacks)
               {
-                callbackRunner.Add(blob);
+                await callbackRunner.AddAsync(blob)
+                                    .ConfigureAwait(false);
               }
             }
           }
@@ -531,9 +550,13 @@ public class SessionHandle : IAsyncDisposable, IDisposable
     ///   Register a new blob having a callback.
     /// </summary>
     /// <param name="blob">The blob definition carrying a callback</param>
-    public void Add(BlobDefinition blob)
-      => callbacks_.GetOrAdd(blob.BlobHandle!.BlobInfo.BlobId,
-                             blob.CallBack!);
+    public async Task AddAsync(BlobDefinition blob)
+    {
+      var blobInfo = await blob.BlobHandle!.GetBlobInfoAsync()
+                               .ConfigureAwait(false);
+      callbacks_.GetOrAdd(blobInfo.BlobId,
+                          blob.CallBack!);
+    }
 
     private async Task ExecuteCallback((ICallback callback, BlobState blobState) tuple)
     {
