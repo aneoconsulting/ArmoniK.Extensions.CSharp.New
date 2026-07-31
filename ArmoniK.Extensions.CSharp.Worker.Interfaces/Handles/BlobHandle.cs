@@ -26,7 +26,18 @@ public class BlobHandle
   private readonly ISdkTaskHandler sdkTaskHandler_;
 
   /// <summary>
-  ///   Creates an of a BlobHandle
+  ///   Promise of the blob id once the blob has actually been created.
+  ///   It needs to be volatile as we need it to play the role of a barrier in GetBlobIdAsync().
+  /// </summary>
+  private volatile TaskCompletionSource<string>? blobIdSource_;
+
+  /// <summary>
+  ///   The blob id once it is known.
+  /// </summary>
+  private string? blobId_;
+
+  /// <summary>
+  ///   Creates an of a BlobHandle that is already resolved.
   /// </summary>
   /// <param name="blobId">The blob id</param>
   /// <param name="sdkTaskHandler">The SDK task handler</param>
@@ -35,20 +46,73 @@ public class BlobHandle
                     ISdkTaskHandler sdkTaskHandler,
                     byte[]?         data = null)
   {
-    BlobId          = blobId;
+    blobId_         = blobId;
     sdkTaskHandler_ = sdkTaskHandler;
     Data            = data;
   }
 
   /// <summary>
-  ///   The blob id
+  ///   Creates a BlobHandle that is not resolved yet. Its blob id will be known once
+  ///   <see cref="BlobIdSource" /> is completed.
   /// </summary>
-  public string BlobId { get; init; }
+  /// <param name="sdkTaskHandler">The SDK task handler</param>
+  internal BlobHandle(ISdkTaskHandler sdkTaskHandler)
+  {
+    sdkTaskHandler_ = sdkTaskHandler;
+    blobIdSource_   = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+  }
 
   /// <summary>
   ///   The blob raw data, null for output blobs
   /// </summary>
   public byte[]? Data { get; init; }
+
+  /// <summary>
+  ///   The TaskCompletionSource valued once the blob has actually been created, null if the handle is already resolved.
+  /// </summary>
+  internal TaskCompletionSource<string>? BlobIdSource
+    => blobIdSource_;
+
+  /// <summary>
+  ///   Whenever the handle is already resolved, returns its blob id, null otherwise.
+  /// </summary>
+  internal string? ResolvedBlobIdOrNull
+    => blobId_;
+
+  /// <summary>
+  ///   Asynchronously retrieves the blob id, waiting for the blob to be created if necessary.
+  /// </summary>
+  /// <returns>A task representing the asynchronous operation. The task result contains the blob id.</returns>
+  public ValueTask<string> GetBlobIdAsync()
+  {
+    var blobId = blobId_;
+    if (blobId is not null)
+    {
+      return new ValueTask<string>(blobId);
+    }
+
+    return Core();
+
+    async ValueTask<string> Core()
+    {
+      // volatile read of blobIdSource_ here has acquire semantics and with the combination
+      // of the volatile write of blobIdSource_ below, it ensures that if we see a null value for blobIdSource_,
+      // we are guaranteed to see a non-null value for blobId_.
+      var tcs = blobIdSource_;
+      if (tcs is null)
+      {
+        return blobId_!;
+      }
+
+      var resolvedBlobId = await tcs.Task.ConfigureAwait(false);
+      blobId_ = resolvedBlobId;
+      // volatile write of blobIdSource_ here has release semantics (allows other threads to see the effects of preceding operations).
+      // This prevent the compiler to do some operation reordering, then we are sure blobId_ has actually been assigned when we reach that point
+      // therefore if a thread can see a null blobIdSource_, it is guaranteed to see a non-null blobId_.
+      blobIdSource_ = null;
+      return resolvedBlobId;
+    }
+  }
 
   /// <summary>
   ///   Decodes the blob's data as a string with a given encoding.

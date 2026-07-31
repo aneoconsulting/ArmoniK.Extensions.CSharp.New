@@ -148,10 +148,14 @@ internal class SdkTaskHandler : ISdkTaskHandler
   public async Task SendResultAsync(BlobHandle         blob,
                                     byte[]             data,
                                     CancellationToken? cancellationToken = null)
-    => await taskHandler_.SendResult(blob.BlobId,
-                                     data,
-                                     cancellationToken)
-                         .ConfigureAwait(false);
+  {
+    var blobId = await blob.GetBlobIdAsync()
+                           .ConfigureAwait(false);
+    await taskHandler_.SendResult(blobId,
+                                  data,
+                                  cancellationToken)
+                      .ConfigureAwait(false);
+  }
 
   /// <summary>Send the results computed by the task</summary>
   /// <param name="blob">The blob handle.</param>
@@ -166,10 +170,14 @@ internal class SdkTaskHandler : ISdkTaskHandler
                                           string             data,
                                           Encoding?          encoding          = null,
                                           CancellationToken? cancellationToken = null)
-    => await taskHandler_.SendResult(blob.BlobId,
-                                     (encoding ?? Encoding.UTF8).GetBytes(data),
-                                     cancellationToken)
-                         .ConfigureAwait(false);
+  {
+    var blobId = await blob.GetBlobIdAsync()
+                           .ConfigureAwait(false);
+    await taskHandler_.SendResult(blobId,
+                                  (encoding ?? Encoding.UTF8).GetBytes(data),
+                                  cancellationToken)
+                      .ConfigureAwait(false);
+  }
 
   /// <summary>Submit tasks with existing payloads (results)</summary>
   /// <param name="taskDefinitions">The requests to create tasks</param>
@@ -193,11 +201,20 @@ internal class SdkTaskHandler : ISdkTaskHandler
     var payloads = new List<Payload>();
     foreach (var task in taskDefinitions)
     {
-      var inputs = task.InputDefinitions.Select(kv => new KeyValuePair<string, string>(kv.Key,
-                                                                                       kv.Value.BlobHandle!.BlobId))
-                       .ToDictionary();
-      var outputs = task.OutputDefinitions.ToDictionary(kv => kv.Key,
-                                                        kv => kv.Value.BlobHandle!.BlobId);
+      var inputs = new Dictionary<string, string>();
+      foreach (var kv in task.InputDefinitions)
+      {
+        inputs[kv.Key] = await kv.Value.BlobHandle!.GetBlobIdAsync()
+                                 .ConfigureAwait(false);
+      }
+
+      var outputs = new Dictionary<string, string>();
+      foreach (var kv in task.OutputDefinitions)
+      {
+        outputs[kv.Key] = await kv.Value.BlobHandle!.GetBlobIdAsync()
+                                  .ConfigureAwait(false);
+      }
+
       payloads.Add(new Payload(inputs,
                                outputs));
     }
@@ -214,19 +231,33 @@ internal class SdkTaskHandler : ISdkTaskHandler
       taskEnumerator.MoveNext();
       var task = taskEnumerator.Current;
       task.TaskOptions.Options[nameof(DynamicLibrary.ConventionVersion)] = DynamicLibrary.ConventionVersion;
-      var dataDependencies = task.InputDefinitions.Values.Select(b => b.BlobHandle!.BlobId);
+      var dataDependencies = new List<string>();
+      foreach (var b in task.InputDefinitions.Values)
+      {
+        dataDependencies.Add(await b.BlobHandle!.GetBlobIdAsync()
+                                    .ConfigureAwait(false));
+      }
+
       if (task.WorkerLibrary != null)
       {
         task.TaskOptions.SetDynamicLibrary(task.WorkerLibrary);
-        dataDependencies = dataDependencies.Concat([task.WorkerLibrary.LibraryBlobId]);
+        dataDependencies.Add(task.WorkerLibrary.LibraryBlobId);
+      }
+
+      var expectedOutputKeys = new List<string>();
+      foreach (var b in task.OutputDefinitions.Values)
+      {
+        expectedOutputKeys.Add(await b.BlobHandle!.GetBlobIdAsync()
+                                      .ConfigureAwait(false));
       }
 
       taskCreations.Add(new SubmitTasksRequest.Types.TaskCreation
                         {
-                          PayloadId = payloadBlobHandle.BlobId,
+                          PayloadId = await payloadBlobHandle.GetBlobIdAsync()
+                                                             .ConfigureAwait(false),
                           ExpectedOutputKeys =
                           {
-                            task.OutputDefinitions.Values.Select(b => b.BlobHandle!.BlobId),
+                            expectedOutputKeys,
                           },
                           DataDependencies =
                           {
@@ -254,12 +285,43 @@ internal class SdkTaskHandler : ISdkTaskHandler
   private async Task CreateBlobsAsync(IEnumerable<BlobDefinition> blobs,
                                       CancellationToken           cancellationToken = default)
   {
+    var definitions = blobs as ICollection<BlobDefinition> ?? blobs.ToList();
+    foreach (var blobDefinition in definitions)
+    {
+      // Ensure every definition has a (possibly pending) handle, covering callers that bypass
+      // SubmitTasksAsync's own eager creation.
+      blobDefinition.EnsureBlobHandle(this);
+    }
+
+    try
+    {
+      await CreateBlobsCoreAsync(definitions,
+                                 cancellationToken)
+        .ConfigureAwait(false);
+    }
+    catch (Exception ex)
+    {
+      // Make sure no caller is left awaiting a handle that will never resolve: every handle in this
+      // call that isn't already resolved transitions to a faulted state (idempotent, safe no-op for
+      // already-resolved ones).
+      foreach (var blobDefinition in definitions)
+      {
+        blobDefinition.BlobHandle?.BlobIdSource?.TrySetException(ex);
+      }
+
+      throw;
+    }
+  }
+
+  private async Task CreateBlobsCoreAsync(IEnumerable<BlobDefinition> blobs,
+                                          CancellationToken           cancellationToken)
+  {
     var blobsWithData    = new List<BlobDefinition>();
     var blobsWithoutData = new List<BlobDefinition>();
 
     foreach (var blob in blobs)
     {
-      if (blob.BlobHandle != null)
+      if (blob.BlobHandle!.ResolvedBlobIdOrNull != null)
       {
         continue;
       }
@@ -288,8 +350,7 @@ internal class SdkTaskHandler : ISdkTaskHandler
                                                    cancellationToken);
         await foreach (var blob in response.ConfigureAwait(false))
         {
-          name2Blob[blob.Name].BlobHandle = new BlobHandle(blob.ResultId,
-                                                           this);
+          name2Blob[blob.Name].BlobHandle!.BlobIdSource!.TrySetResult(blob.ResultId);
         }
       }
     }
@@ -312,8 +373,7 @@ internal class SdkTaskHandler : ISdkTaskHandler
                                            .ConfigureAwait(false);
           foreach (var blob in response.Results)
           {
-            name2Blob[blob.Name].BlobHandle = new BlobHandle(blob.ResultId,
-                                                             this);
+            name2Blob[blob.Name].BlobHandle!.BlobIdSource!.TrySetResult(blob.ResultId);
           }
         }
       }
