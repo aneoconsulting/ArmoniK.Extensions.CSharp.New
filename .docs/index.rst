@@ -42,3 +42,9 @@ ArmoniK.Extensions.CSharp documentation
    :glob:
 
    content/contrib-and-dev/*
+
+.. toctree::
+   :maxdepth: 1
+   :caption: API reference
+
+   content/csharp/index.rst

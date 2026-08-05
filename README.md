@@ -12,6 +12,7 @@ Full documentation (quick starts, concepts, user guide, API reference, contribut
 ```bash
 python -m venv .venv-doc && source .venv-doc/bin/activate
 pip install -r .docs/requirements.txt
+tools/generate-csharp-doc.sh
 sphinx-build -M html .docs build
 ```
 

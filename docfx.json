@@ -1,0 +1,21 @@
+{
+  "$schema": "https://raw.githubusercontent.com/dotnet/docfx/main/schemas/docfx.schema.json",
+  "metadata": [
+    {
+      "src": [
+        {
+          "src": ".",
+          "files": [
+            "ArmoniK.Extensions.CSharp.Client/**/*.csproj",
+            "ArmoniK.Extensions.CSharp.Common/**/*.csproj",
+            "ArmoniK.Extensions.CSharp.Worker/**/*.csproj",
+            "ArmoniK.Extensions.CSharp.Worker.Interfaces/**/*.csproj"
+          ]
+        }
+      ],
+      "outputFormat": "markdown",
+      "output": ".docs/content/csharp",
+      "namespaceLayout": "nested"
+    }
+  ]
+}

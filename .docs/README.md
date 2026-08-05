@@ -24,9 +24,10 @@ pip install -r .docs/requirements.txt
 
 ## Usage
 
-To build the docs locally, run the following command:
+To build the docs locally, run the following commands:
 
 ```bash
+tools/generate-csharp-doc.sh
 sphinx-build -M html .docs build
 ```
 
