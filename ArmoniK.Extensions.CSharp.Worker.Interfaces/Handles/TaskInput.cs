@@ -59,4 +59,11 @@ public sealed class TaskInput
   /// <returns>The underlying blob handle.</returns>
   public BlobHandle AsBlobHandle()
     => handle_;
+
+  /// <summary>
+  ///   Implicitly exposes the underlying blob handle, e.g. to reuse this input as another task's input.
+  /// </summary>
+  /// <param name="input">The TaskInput to convert.</param>
+  public static implicit operator BlobHandle(TaskInput input)
+    => input.handle_;
 }

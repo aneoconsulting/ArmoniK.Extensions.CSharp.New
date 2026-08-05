@@ -70,4 +70,11 @@ public sealed class TaskOutput
   /// <returns>The underlying blob handle.</returns>
   public BlobHandle AsBlobHandle()
     => handle_;
+
+  /// <summary>
+  ///   Implicitly exposes the underlying blob handle, e.g. to delegate this output to a sub-task.
+  /// </summary>
+  /// <param name="output">The TaskOutput to convert.</param>
+  public static implicit operator BlobHandle(TaskOutput output)
+    => output.handle_;
 }

@@ -77,8 +77,7 @@ internal class CheckBlobCreationResponseOrderWorker : IWorker
                                  BlobDefinition.FromString(city,
                                                            city))
                       .WithOutput(city,
-                                  BlobDefinition.FromBlobHandle(taskHandler.Outputs[city]
-                                                                           .AsBlobHandle()));
+                                  BlobDefinition.FromBlobHandle(taskHandler.Outputs[city]));
       }
 
       await taskHandler.SubmitTasksAsync([taskDefinition],

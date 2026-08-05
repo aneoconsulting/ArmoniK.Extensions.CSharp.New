@@ -39,7 +39,7 @@ public class PriorityWorker : IWorker
       var strResult = $"Payload is {priority} and TaskOptions.Priority is {taskHandler.TaskOptions.Priority}";
 
       var result = taskHandler.Outputs.Single()
-                              .Value.AsBlobHandle();
+                              .Value;
       logger.LogInformation($"Sending result: {strResult}. Task Id: {taskHandler.TaskId}");
       await taskHandler.SendResultAsync(result,
                                         Encoding.ASCII.GetBytes(strResult))
