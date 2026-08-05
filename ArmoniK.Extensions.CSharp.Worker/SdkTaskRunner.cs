@@ -52,8 +52,8 @@ public static class SdkTaskRunner
       throw new ArmoniKSdkException($"ArmoniK SDK version '{conventionVersion}' not supported.");
     }
 
-    var dataDependencies = new Dictionary<string, BlobHandle>();
-    var expectedResults  = new Dictionary<string, BlobHandle>();
+    var dataDependencies = new Dictionary<string, TaskInput>();
+    var expectedResults  = new Dictionary<string, TaskOutput>();
     var sdkTaskHandler = new SdkTaskHandler(taskHandler,
                                             dataDependencies,
                                             expectedResults);
@@ -68,17 +68,17 @@ public static class SdkTaskRunner
         var name   = pair.Key;
         var blobId = pair.Value;
         var data   = taskHandler.DataDependencies[blobId];
-        dataDependencies[name] = new BlobHandle(blobId,
-                                                sdkTaskHandler,
-                                                data);
+        dataDependencies[name] = new TaskInput(new BlobHandle(blobId,
+                                                              sdkTaskHandler,
+                                                              data));
       }
 
       foreach (var pair in name2BlobId.Outputs)
       {
         var name   = pair.Key;
         var blobId = pair.Value;
-        expectedResults[name] = new BlobHandle(blobId,
-                                               sdkTaskHandler);
+        expectedResults[name] = new TaskOutput(new BlobHandle(blobId,
+                                                              sdkTaskHandler));
       }
     }
     catch (Exception ex)

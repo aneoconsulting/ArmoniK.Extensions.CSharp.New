@@ -66,7 +66,7 @@ public class GaussProblemWorker : IWorker
     var             taskDefinitions    = new List<TaskDefinition>();
     var             allTaskDefinitions = new List<TaskDefinition>();
     BlobDefinition? lastBlobDefinition = null;
-    var inputs = taskHandler.Inputs.Values.Select(BlobDefinition.FromBlobHandle)
+    var inputs = taskHandler.Inputs.Values.Select(input => BlobDefinition.FromBlobHandle(input))
                             .ToList();
     var currentLibrary = taskHandler.TaskOptions.GetDynamicLibrary();
 

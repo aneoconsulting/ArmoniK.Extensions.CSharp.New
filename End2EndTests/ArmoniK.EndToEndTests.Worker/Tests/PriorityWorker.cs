@@ -34,7 +34,8 @@ public class PriorityWorker : IWorker
   {
     try
     {
-      var priority  = taskHandler.GetStringDependency("Priority");
+      var priority = taskHandler.Inputs["Priority"]
+                                .GetStringData();
       var strResult = $"Payload is {priority} and TaskOptions.Priority is {taskHandler.TaskOptions.Priority}";
 
       var result = taskHandler.Outputs.Single()
