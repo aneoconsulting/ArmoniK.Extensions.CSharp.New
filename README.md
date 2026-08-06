@@ -1,10 +1,26 @@
 # ArmoniK C# Client Extensions
 
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
 ## Overview
-This project contains the new ArmoniK C# client extensions. It proposes a new approach to ArmoniK usage of ArmoniK API. It enables users to detail their task graphs in a better way managing data dependencies and enabling better data management between tasks. It also allows users to make use of the async programming functions which where not available on the actual SDK. 
+This project contains the ArmoniK C# client extensions, providing an approach to ArmoniK usage of the ArmoniK API. It enables users to detail their task graphs in a better way managing data dependencies and enabling better data management between tasks. It also allows users to make use of async programming throughout.
+
+## Documentation
+
+Full documentation (quick starts, concepts, user guide, API reference, contributing guide) lives under [`.docs/`](.docs/) and is built with Sphinx. To build it locally:
+
+```bash
+python -m venv .venv-doc && source .venv-doc/bin/activate
+pip install -r .docs/requirements.txt
+tools/generate-csharp-doc.sh
+sphinx-build -M html .docs build
+```
+
+Outputs are written to `build/html/index.html`. See [`.docs/README.md`](.docs/README.md) for details.
 
 ## Table of Contents
 - [Overview](#overview)
+- [Documentation](#documentation)
 - [Concepts](#concepts)
 - [Usage](#usage)
 
