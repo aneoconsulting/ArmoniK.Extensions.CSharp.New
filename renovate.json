@@ -1,0 +1,55 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:base",
+    "group:allNonMajor",
+    ":semanticCommitTypeAll(chore)",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "ignorePresets": [
+    ":ignoreModulesAndTests"
+  ],
+  "semanticCommits": "enabled",
+  "rangeStrategy": "bump",
+  "prBodyTemplate": "# Motivation\n\nAutomated dependency update by Renovate bot.\n\n# Description\n\n{{{table}}}{{{notes}}}\n\n# Testing\n\nThis is an automated dependency update. No functional changes are expected.\n\n# Impact\n\n{{{changelogs}}}\n\n# Additional Information\n\n{{{warnings}}}{{{errors}}}{{{controls}}}This PR was generated automatically by [Renovate](https://docs.renovatebot.com/).",
+  "packageRules": [
+    {
+      "groupName": "nuget packages",
+      "groupSlug": "nuget",
+      "matchDatasources": [
+        "nuget"
+      ]
+    },
+    {
+      "groupName": "ArmoniK.Api",
+      "groupSlug": "nuget-armonik-api",
+      "matchDatasources": [
+        "nuget"
+      ],
+      "matchPackagePrefixes": [
+        "ArmoniK.Api"
+      ]
+    },
+    {
+      "groupName": "docker images",
+      "groupSlug": "docker",
+      "matchDatasources": [
+        "docker"
+      ]
+    },
+    {
+      "groupName": "docs python packages",
+      "groupSlug": "docs-pypi",
+      "matchDatasources": [
+        "pypi"
+      ]
+    },
+    {
+      "groupName": "github actions",
+      "groupSlug": "github-actions",
+      "matchDatasources": [
+        "github-tags"
+      ]
+    }
+  ]
+}
