@@ -52,6 +52,7 @@ public class ClientServiceConnector
                     OverrideTargetName    = properties.TargetNameOverride,
                     BackoffMultiplier     = properties.RetryBackoffMultiplier,
                     InitialBackOff        = properties.RetryInitialBackoff,
+                    MaxBackOff            = properties.RetryMaxBackoff,
                   };
 
     return new ObjectPool<ChannelBase>(int.MaxValue,
