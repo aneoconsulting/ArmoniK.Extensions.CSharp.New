@@ -6,8 +6,10 @@ FROM alpine:3.24.3 AS tini-build
 RUN apk add gcc cmake make musl-dev
 ADD https://github.com/krallin/tini.git .
 
-# By default, tini uses buffered IO. Disable buffering to have logs in real-time
-RUN sed -i '/int main/a setvbuf(stdout, NULL, _IOLBF, BUFSIZ);setvbuf(stderr, NULL, _IOLBF, BUFSIZ);' src/tini.c
+# By default, tini uses buffered IO. Disable buffering to have logs in real-time.
+# The check fails the build if the anchor matched no line, or several, in a future tini.c
+RUN sed -i '/int main/a setvbuf(stdout, NULL, _IOLBF, BUFSIZ);setvbuf(stderr, NULL, _IOLBF, BUFSIZ);' src/tini.c && \
+    [ "$(grep -c 'setvbuf(stdout' src/tini.c)" -eq 1 ]
 RUN cmake . && make
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
