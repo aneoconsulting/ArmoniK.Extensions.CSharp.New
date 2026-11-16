@@ -53,6 +53,7 @@ public class ClientServiceConnector
                     BackoffMultiplier     = properties.RetryBackoffMultiplier,
                     InitialBackOff        = properties.RetryInitialBackoff,
                     MaxBackOff            = properties.RetryMaxBackoff,
+                    MaxAttempts           = properties.RetryMaxAttempts,
                   };
 
     return new ObjectPool<ChannelBase>(int.MaxValue,

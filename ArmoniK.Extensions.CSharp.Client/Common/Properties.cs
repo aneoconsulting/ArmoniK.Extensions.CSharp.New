@@ -48,6 +48,7 @@ public record Properties
   private const string SectionRetryInitialBackoff    = "RetryInitialBackoff";
   private const string SectionRetryBackoffMultiplier = "RetryBackoffMultiplier";
   private const string SectionRetryMaxBackoff        = "RetryMaxBackoff";
+  private const string SectionRetryMaxAttempts       = "RetryMaxAttempts";
 
   /// <summary>
   ///   The constructor to instantiate Properties object
@@ -96,6 +97,7 @@ public record Properties
   /// <param name="retryInitialBackoff">Initial retry backoff delay</param>
   /// <param name="retryBackoffMultiplier">Retry backoff multiplier</param>
   /// <param name="retryMaxBackoff">Max retry backoff</param>
+  /// <param name="retryMaxAttempts">Maximum number of attempts of a call, including the first one</param>
   /// <exception cref="ArgumentException"></exception>
   public Properties(IConfiguration configuration,
                     string?        connectionAddress      = null,
@@ -108,7 +110,8 @@ public record Properties
                     bool?          sslValidation          = null,
                     TimeSpan       retryInitialBackoff    = new(),
                     double         retryBackoffMultiplier = 0,
-                    TimeSpan       retryMaxBackoff        = new())
+                    TimeSpan       retryMaxBackoff        = new(),
+                    int            retryMaxAttempts       = 0)
   {
     Configuration = configuration;
 
@@ -191,6 +194,22 @@ public record Properties
     else if (!string.IsNullOrWhiteSpace(sectionGrpc[SectionRetryMaxBackoff]))
     {
       RetryMaxBackoff = TimeSpan.Parse(sectionGrpc[SectionRetryMaxBackoff]!);
+    }
+
+    if (retryMaxAttempts != 0)
+    {
+      RetryMaxAttempts = retryMaxAttempts;
+    }
+    else if (!string.IsNullOrWhiteSpace(sectionGrpc[SectionRetryMaxAttempts]))
+    {
+      RetryMaxAttempts = int.Parse(sectionGrpc[SectionRetryMaxAttempts]!);
+    }
+
+    if (RetryMaxAttempts < 2)
+    {
+      throw new ArgumentOutOfRangeException(nameof(retryMaxAttempts),
+                                            RetryMaxAttempts,
+                                            "The maximum number of attempts must be greater than 1");
     }
 
     if (connectionPort != 0)
@@ -294,6 +313,12 @@ public record Properties
   ///   Max backoff for retries
   /// </summary>
   public TimeSpan RetryMaxBackoff { get; init; } = TimeSpan.FromSeconds(30);
+
+  /// <summary>
+  ///   Maximum number of attempts of a call, including the first one. Must be greater than 1.
+  ///   gRPC caps it to 5 by default (GrpcChannelOptions.MaxRetryAttempts).
+  /// </summary>
+  public int RetryMaxAttempts { get; init; } = 5;
 
   /// <summary>
   ///   Interval between two polling attempts when waiting for blob/result completion to invoke registered callbacks
