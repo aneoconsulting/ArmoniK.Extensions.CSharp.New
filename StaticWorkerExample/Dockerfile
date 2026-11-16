@@ -20,9 +20,12 @@ RUN dotnet publish "./StaticWorkerExample.csproj" -c $BUILD_CONFIGURATION -o /ap
 
 FROM base AS final
 WORKDIR /app
+ARG TARGETARCH
+# tini runs as PID 1: it forwards signals to the worker and reaps zombie processes
+ADD --chmod=755 https://github.com/krallin/tini/releases/download/v0.19.0/tini-static-${TARGETARCH} /tini
 COPY --from=publish /app/publish .
 RUN groupadd --gid 5000 armonikuser && useradd --home-dir /home/armonikuser --create-home --uid 5000 --gid 5000 --shell /bin/sh --skel /dev/null armonikuser
 RUN mkdir /cache && chown armonikuser: /cache
 USER armonikuser
 EXPOSE 1080
-ENTRYPOINT ["dotnet", "StaticWorkerExample.dll"]
+ENTRYPOINT ["/tini", "-s", "-vv", "--", "dotnet", "StaticWorkerExample.dll"]
