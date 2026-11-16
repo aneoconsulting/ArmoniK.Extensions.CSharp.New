@@ -41,18 +41,7 @@ public class ClientServiceConnector
   public static ObjectPool<ChannelBase> ControlPlaneConnectionPool(Properties      properties,
                                                                    ILoggerFactory? loggerFactory = null)
   {
-    var options = new GrpcClient
-                  {
-                    AllowUnsafeConnection = !properties.ConfSslValidation,
-                    CaCert                = properties.CaCertFilePem,
-                    CertP12               = properties.ClientP12File,
-                    CertPem               = properties.ClientCertFilePem,
-                    KeyPem                = properties.ClientKeyFilePem,
-                    Endpoint              = properties.ControlPlaneUri.ToString(),
-                    OverrideTargetName    = properties.TargetNameOverride,
-                    BackoffMultiplier     = properties.RetryBackoffMultiplier,
-                    InitialBackOff        = properties.RetryInitialBackoff,
-                  };
+    var options = CreateGrpcClientOptions(properties);
 
     return new ObjectPool<ChannelBase>(int.MaxValue,
                                        ct => new ValueTask<ChannelBase>(GrpcChannelFactory.CreateChannel(options,
@@ -60,4 +49,24 @@ public class ClientServiceConnector
                                        (_,
                                         _) => new ValueTask<bool>(true));
   }
+
+  /// <summary>
+  ///   Build the options used to create the gRPC channels to the control plane
+  /// </summary>
+  /// <param name="properties">Configuration Properties</param>
+  /// <returns>The gRPC client options</returns>
+  internal static GrpcClient CreateGrpcClientOptions(Properties properties)
+    => new()
+       {
+         AllowUnsafeConnection = !properties.ConfSslValidation,
+         CaCert                = properties.CaCertFilePem,
+         CertP12               = properties.ClientP12File,
+         CertPem               = properties.ClientCertFilePem,
+         KeyPem                = properties.ClientKeyFilePem,
+         Endpoint              = properties.ControlPlaneUri.ToString(),
+         OverrideTargetName    = properties.TargetNameOverride,
+         BackoffMultiplier     = properties.RetryBackoffMultiplier,
+         InitialBackOff        = properties.RetryInitialBackoff,
+         MaxBackOff            = properties.RetryMaxBackoff,
+       };
 }
