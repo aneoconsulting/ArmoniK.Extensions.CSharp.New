@@ -1,5 +1,11 @@
 #See https://aka.ms/customizecontainer to learn how to customize your debug container and how Visual Studio uses this Dockerfile to build your images for faster debugging.
 
+# Runtime base image, overridable to build the image variants:
+#   --build-arg BASE_IMAGE=mcr.microsoft.com/dotnet/aspnet:10.0-resolute-chiseled-extra
+#   --build-arg BASE_IMAGE=mcr.microsoft.com/dotnet/aspnet:10.0-azurelinux4.0-distroless-extra
+# Chiseled and distroless images have no shell: the final stage must not contain any RUN instruction.
+ARG BASE_IMAGE=mcr.microsoft.com/dotnet/aspnet:10.0
+
 # tini built from source, as in ArmoniK.Core: the release binary buffers its own output,
 # so its -vv logs are delayed, or lost when the container is SIGKILLed
 FROM alpine:3.24.3 AS tini-build
@@ -12,7 +18,10 @@ RUN sed -i '/int main/a setvbuf(stdout, NULL, _IOLBF, BUFSIZ);setvbuf(stderr, NU
     [ "$(grep -c 'setvbuf(stdout' src/tini.c)" -eq 1 ]
 RUN cmake . && make
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
+# Empty directory, copied with the right owner into the final image to create /cache and the home directory
+RUN mkdir /empty
+
+FROM ${BASE_IMAGE} AS base
 WORKDIR /app
 EXPOSE 80
 EXPOSE 443
@@ -35,8 +44,11 @@ WORKDIR /app
 # tini runs as PID 1: it forwards signals to the worker and reaps zombie processes
 COPY --from=tini-build /tini-static /tini
 COPY --from=publish /app/publish .
-RUN groupadd --gid 5000 armonikuser && useradd --home-dir /home/armonikuser --create-home --uid 5000 --gid 5000 --shell /bin/sh --skel /dev/null armonikuser
-RUN mkdir /cache && chown armonikuser: /cache
-USER armonikuser
+# The worker runs as uid/gid 5000 on every variant. No user is declared in /etc/passwd
+# (useradd needs a shell, absent from chiseled and distroless images), so HOME is set explicitly.
+COPY --from=tini-build --chown=5000:5000 /empty /home/armonikuser
+COPY --from=tini-build --chown=5000:5000 /empty /cache
+ENV HOME=/home/armonikuser
+USER 5000:5000
 EXPOSE 1080
 ENTRYPOINT ["/tini", "-s", "-vv", "--", "dotnet", "ArmoniK.Extensions.CSharp.DynamicWorker.dll"]

@@ -99,11 +99,21 @@ jobs:
       - versionning
       - runTests
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         include:
         - img : dockerhubaneo/armonik-dynamic-dotnet-worker
           path : ./ArmoniK.Extensions.CSharp.DynamicWorker/Dockerfile
+          suffix: ""
+          base: mcr.microsoft.com/dotnet/aspnet:10.0
+        - img : dockerhubaneo/armonik-dynamic-dotnet-worker
+          path : ./ArmoniK.Extensions.CSharp.DynamicWorker/Dockerfile
+          suffix: "-resolute-chiseled-extra"
+          base: mcr.microsoft.com/dotnet/aspnet:10.0-resolute-chiseled-extra
+        - img : dockerhubaneo/armonik-dynamic-dotnet-worker
+          path : ./ArmoniK.Extensions.CSharp.DynamicWorker/Dockerfile
+          suffix: "-azurelinux4.0-distroless-extra"
+          base: mcr.microsoft.com/dotnet/aspnet:10.0-azurelinux4.0-distroless-extra
 
     steps:
     - name: Checkout
@@ -127,11 +137,13 @@ jobs:
     - name: Build and push
       uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
       with:
-        file: ./ArmoniK.Extensions.CSharp.DynamicWorker/Dockerfile
+        file: ${{ matrix.path }}
         context: .
+        build-args: |
+          BASE_IMAGE=${{ matrix.base }}
         platforms: |
           linux/arm64
           linux/amd64
         push: true
         tags: |
-            dockerhubaneo/armonik-dynamic-dotnet-worker:${{ needs.versionning.outputs.version }}
+            dockerhubaneo/armonik-dynamic-dotnet-worker:${{ needs.versionning.outputs.version }}${{ matrix.suffix }}
